@@ -1,0 +1,52 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+  font-size: 16px;
+}
+
+main {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-prose);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-3);
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.25rem; }
+
+p { margin: 0 0 var(--space-3); }
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+}
+a:hover { color: var(--accent); }
+
+hr { border: 0; border-top: 1px solid var(--rule); margin: var(--space-4) 0; }
+
+button {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+button:hover { border-color: var(--fg); }
+
+.muted { color: var(--muted); }

@@ -1,0 +1,5 @@
+{:kira.reader.log/publisher
+ {:pretty? true}
+
+ :kira.reader.http/server
+ {:port 3000}}

@@ -1,0 +1,33 @@
+{:paths ["src" "resources"]
+
+ :deps {org.clojure/clojure       {:mvn/version "1.12.0"}
+        integrant/integrant       {:mvn/version "0.10.0"}
+        meta-merge/meta-merge     {:mvn/version "1.0.0"}
+        http-kit/http-kit         {:mvn/version "2.8.0"}
+        metosin/reitit            {:mvn/version "0.7.2"}
+        metosin/malli             {:mvn/version "0.16.4"}
+        hiccup/hiccup             {:mvn/version "2.0.0-RC3"}
+        com.brunobonacci/mulog    {:mvn/version "0.9.0"}
+        org.clojure/core.cache    {:mvn/version "1.1.234"}
+        org.clojure/core.async    {:mvn/version "1.6.681"}}
+
+ :aliases
+ {:dev    {:extra-paths ["dev" "resources-dev"]
+           :extra-deps  {integrant/repl {:mvn/version "0.3.3"}}
+           :main-opts   ["-m" "kira.reader.main"]}
+
+  :test   {:extra-paths ["test" "resources-test"]
+           :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+           :main-opts   ["-m" "kaocha.runner"]}
+
+  :prod   {:extra-paths ["resources-prod"]
+           :main-opts   ["-m" "kira.reader.main"]}
+
+  :lint   {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.09.27"}}
+           :main-opts    ["-m" "clj-kondo.main" "--lint" "src" "test" "dev"]}
+
+  :cljfmt {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.13.0"}}
+           :main-opts    ["-m" "cljfmt.main"]}
+
+  :build  {:deps      {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+           :ns-default build}}}

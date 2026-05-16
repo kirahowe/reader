@@ -1,0 +1,17 @@
+.git
+.github
+target
+.cpcache
+.clj-kondo/.cache
+.lsp
+.calva
+.nrepl-port
+*.log
+.env*
+dev
+test
+resources-dev
+resources-test
+docker-compose.yml
+fly.toml
+README*

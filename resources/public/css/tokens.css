@@ -1,0 +1,28 @@
+:root {
+  --bg: #fafaf7;
+  --fg: #1a1a1a;
+  --muted: #6b6b6b;
+  --rule: #e4e1da;
+  --accent: #2b4a3f;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --font-prose: Charter, "Iowan Old Style", "Source Serif Pro", Georgia, serif;
+
+  --measure: 68ch;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 2rem;
+  --space-5: 4rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --fg: #ececec;
+    --muted: #9a9a9a;
+    --rule: #2a2a2a;
+    --accent: #9fbfb1;
+  }
+}

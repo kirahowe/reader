@@ -1,0 +1,13 @@
+target/
+.cpcache/
+.clj-kondo/.cache/
+.lsp/
+.calva/
+.nrepl-port
+.portal/
+*.log
+.envrc
+.env
+.env.local
+.DS_Store
+node_modules/

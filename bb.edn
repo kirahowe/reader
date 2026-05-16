@@ -1,0 +1,39 @@
+{:tasks
+ {:requires ([babashka.process :refer [shell]])
+
+  repl       {:doc              "Start a Clojure REPL with dev + test on the classpath"
+              :override-builtin true
+              :task             (shell "clojure" "-M:dev:test")}
+
+  dev        {:doc  "Run the app with the dev overlay"
+              :task (shell "clojure" "-M:dev")}
+
+  infra:up   {:doc  "Start local infra (postgres + minio) via docker compose"
+              :task (shell "docker" "compose" "up" "-d")}
+
+  infra:down {:task (shell "docker" "compose" "down")}
+
+  lint       {:doc  "Lint with clj-kondo"
+              :task (shell "clojure" "-M:lint")}
+
+  fmt        {:doc  "Check formatting with cljfmt"
+              :task (shell "clojure" "-M:cljfmt" "check")}
+
+  fmt:fix    {:doc  "Fix formatting with cljfmt"
+              :task (shell "clojure" "-M:cljfmt" "fix")}
+
+  test       {:doc  "Run tests with kaocha"
+              :task (shell "clojure" "-M:test")}
+
+  ci         {:doc     "Lint + fmt-check + tests"
+              :depends [lint fmt test]}
+
+  build      {:doc  "Build an uberjar"
+              :task (shell "clojure" "-T:build" "uberjar")}
+
+  image      {:doc     "Build a container image"
+              :depends [build]
+              :task    (shell "docker" "build" "-t" "kira/reader:latest" ".")}
+
+  deploy     {:doc  "Deploy to fly.io"
+              :task (shell "flyctl" "deploy" "--remote-only")}}}

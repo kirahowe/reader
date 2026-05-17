@@ -1,8 +1,6 @@
 (ns build
   (:require [clojure.tools.build.api :as b]))
 
-(def lib 'kira/reader)
-(def version "0.1.0-SNAPSHOT")
 (def class-dir "target/classes")
 (def uber-file "target/reader.jar")
 
@@ -18,10 +16,10 @@
     (b/copy-dir {:src-dirs   (:paths b)
                  :target-dir class-dir})
     (b/compile-clj {:basis      b
-                    :ns-compile '[kira.reader.main]
+                    :ns-compile '[reader.core]
                     :class-dir  class-dir})
     (b/uber {:class-dir class-dir
              :uber-file uber-file
              :basis     b
-             :main      'kira.reader.main}))
+             :main      'reader.core}))
   (println "built" uber-file))

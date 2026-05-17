@@ -10,7 +10,7 @@ COPY deps.edn build.clj ./
 RUN clojure -P -T:build
 COPY src ./src
 COPY resources ./resources
-COPY resources-prod ./resources-prod
+COPY env/prod ./env/prod
 RUN clojure -T:build uberjar
 
 FROM eclipse-temurin:25-jre

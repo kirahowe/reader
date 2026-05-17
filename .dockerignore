@@ -8,10 +8,9 @@ target
 .nrepl-port
 *.log
 .env*
-dev
+env/dev
+env/test
 test
-resources-dev
-resources-test
 docker-compose.yml
 fly.toml
-README*
+docs

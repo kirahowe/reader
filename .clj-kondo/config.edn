@@ -1,5 +1,5 @@
 {:linters {:unresolved-symbol  {:exclude [integrant.repl.state/system]}
            :unused-binding     {:level :warning}
            :unused-referred-var {:level :warning}}
- :lint-as {integrant.core/init-key clojure.core/defmulti
+ :lint-as {integrant.core/init-key  clojure.core/defmulti
            integrant.core/halt-key! clojure.core/defmulti}}

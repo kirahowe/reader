@@ -155,12 +155,15 @@ schema is designed for multi-tenancy from the start.
 
 ### `email_inboxes`
 The per-user inbound email alias(es) used for newsletter forwarding.
+Aliases are random tokens — never derived from a display name or email
+— so they're unguessable, don't leak identity to senders, and can be
+rotated independently of the user.
 
 | column     | type        | notes                                       |
 | ---------- | ----------- | ------------------------------------------- |
 | `id`       | uuid PK     |                                             |
 | `user_id`  | uuid FK     | → `users.id`                                |
-| `alias`    | text UK     | e.g. `kira-abc@reader.kira.is`              |
+| `alias`    | text UK     | random token, e.g. `r-7f3a9b2c@reader.kira.is` |
 | `created_at`| timestamptz|                                             |
 
 ### `queue_items`
@@ -363,7 +366,7 @@ add new source types without migrating. A queue item from email looks
 like:
 
 ```json
-{"source": "email", "alias": "kira-abc@reader.kira.is",
+{"source": "email", "alias": "r-7f3a9b2c@reader.kira.is",
  "from": "ben@stratechery.com", "subject": "…"}
 ```
 

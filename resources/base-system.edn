@@ -1,0 +1,11 @@
+{:reader.log/publisher
+ {:type    :console
+  :pretty? false}
+
+ :reader.http/handler
+ {}
+
+ :reader.http/server
+ {:handler #ig/ref :reader.http/handler
+  :port    8080
+  :host    "0.0.0.0"}}

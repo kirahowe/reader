@@ -14,7 +14,7 @@ flowchart TB
   end
 
   subgraph cloudflare["Cloudflare edge"]
-    emailrt["Email Routing<br/><i>user-abc@reader.kira.is</i>"]
+    emailrt["Email Routing<br/><i>r-7f3a9b2c@reader.kira.is</i>"]
     worker["Email-Routing Worker<br/><i>parses + forwards</i>"]
     r2[("R2<br/><i>PDFs, raw emails</i>")]
   end
@@ -43,12 +43,7 @@ flowchart TB
     httpkit --> mw --> reitit --> domain
   end
 
-  subgraph postgres["Postgres (Fly volume)"]
-    direction LR
-    pg_readables[("articles<br/>papers<br/>newsletter_issues")]
-    pg_people[("authors<br/>affiliations")]
-    pg_state[("queue_items<br/>jobs<br/>users")]
-  end
+  neon[("Neon<br/><i>managed Postgres</i><br/>authors, affiliations,<br/>readables, queue, jobs")]
 
   subgraph hanko["Hanko"]
     hk["passwordless auth"]
@@ -61,15 +56,12 @@ flowchart TB
   worker -->|signed POST /api/inbound| httpkit
   worker -->|put raw .eml| r2
 
-  domain -->|next.jdbc + HoneySQL| pg_readables
-  domain --> pg_people
-  domain --> pg_state
+  domain -->|next.jdbc + HoneySQL| neon
   domain -->|S3 SDK| r2
   domain <-->|JWT verify| hk
   authui <-->|magic links| hk
 
-  workers --> pg_state
-  workers --> pg_readables
+  workers --> neon
   workers --> r2
 
   domain -.publishes events.-> mulog
@@ -82,7 +74,7 @@ flowchart TB
 
   classDef ext fill:#f4f1ec,stroke:#999,color:#333
   classDef ig fill:#e8f0eb,stroke:#2b4a3f,color:#1a1a1a
-  class cloudflare,hanko,postgres ext
+  class cloudflare,hanko ext
   class ig ig
 ```
 
@@ -90,34 +82,34 @@ flowchart TB
 
 The system has three trust boundaries:
 
-| From                           | To             | What crosses                            | Validated by                              |
-| ------------------------------ | -------------- | --------------------------------------- | ----------------------------------------- |
-| Browser                        | http-kit       | HTTP requests                           | Malli coercion at the route               |
-| Cloudflare Email Worker        | http-kit       | Inbound email payloads (`/api/inbound`) | Shared-secret signature + Malli on body   |
-| Hanko                          | http-kit       | JWT in session cookie                   | Hanko-issued JWT verification             |
+| From                    | To       | What crosses                            | Validated by                              |
+| ----------------------- | -------- | --------------------------------------- | ----------------------------------------- |
+| Browser                 | http-kit | HTTP requests                           | Malli coercion at the route               |
+| Cloudflare Email Worker | http-kit | Inbound email payloads (`/api/inbound`) | Shared-secret signature + Malli on body   |
+| Hanko                   | http-kit | JWT in session cookie                   | Hanko-issued JWT verification             |
 
-Everything inside the Fly.io machine is trusted code we wrote. The
+Inside the Fly machine, everything is first-party code. The
 "core/shell" discipline (pure logic vs. effectful edges) is an
 organizing principle within the codebase, not a runtime boundary.
 
 ## Stateful components owned by Integrant
 
 Every cell in this table has a `defmethod ig/init-key` and a
-matching `defmethod ig/halt-key!`. Nothing in this column reads from
-the environment at use-time; it is configured once at startup and
-passed to its consumers.
+matching `defmethod ig/halt-key!`. Each is configured once at startup
+and passed to its consumers — none of these are looked up globally
+at use-time.
 
-| Component                          | Owns                                              |
-| ---------------------------------- | ------------------------------------------------- |
-| `:kira.reader.log/publisher`       | the mu/log publisher thread                       |
-| `:kira.reader.http/handler`        | the Reitit-built Ring handler (stateless, but configured) |
-| `:kira.reader.http/server`         | the http-kit server (port, threads, lifecycle)    |
-| `:kira.reader.db/datasource` *(soon)* | the Postgres connection pool                   |
-| `:kira.reader.db/migrator` *(soon)* | Migratus runner, runs once at startup            |
-| `:kira.reader.storage/r2` *(soon)* | the S3 SDK client wired to R2                    |
-| `:kira.reader.cache/lru` *(soon)*  | a named core.cache instance                       |
-| `:kira.reader.jobs/worker` *(soon)*| a core.async loop pulling from the `jobs` table   |
-| `:kira.reader.inbound/parser` *(soon)*| email parsing pipeline                        |
+| Component                            | Owns                                                |
+| ------------------------------------ | --------------------------------------------------- |
+| `:reader.log/publisher`              | the mu/log publisher                                |
+| `:reader.http/handler`               | the Reitit-built Ring handler                       |
+| `:reader.http/server`                | the http-kit server (port, threads, lifecycle)      |
+| `:reader.db/datasource` *(soon)*     | the Postgres connection pool (Neon)                 |
+| `:reader.db/migrator` *(soon)*       | Migratus runner, runs once at startup               |
+| `:reader.storage/r2` *(soon)*        | the S3 SDK client wired to R2                       |
+| `:reader.cache/lru` *(soon)*         | a named core.cache instance                         |
+| `:reader.jobs/worker` *(soon)*       | a core.async loop draining the `jobs` table         |
+| `:reader.inbound/parser` *(soon)*    | email parsing pipeline                              |
 
 ## Request lifecycle: typical page render
 
@@ -127,7 +119,7 @@ sequenceDiagram
   participant B as Browser
   participant H as http-kit + Reitit
   participant D as domain handler
-  participant DB as Postgres
+  participant DB as Postgres (Neon)
   participant L as mu/log
 
   B->>H: GET /queue (cookie: session JWT)
@@ -152,9 +144,9 @@ sequenceDiagram
   participant R as R2 bucket
   participant H as http-kit /api/inbound
   participant J as jobs worker
-  participant DB as Postgres
+  participant DB as Postgres (Neon)
 
-  E->>CR: SMTP to user-abc@reader.kira.is
+  E->>CR: SMTP to r-7f3a9b2c@reader.kira.is
   CR->>CW: raw email
   CW->>R: PUT raw .eml (object key)
   CW->>H: POST /api/inbound (HMAC-signed)
@@ -176,8 +168,8 @@ flowchart LR
   gh -->|on push to main| ga["GitHub Actions<br/>bb ci"]
   ga -->|on green| fly["flyctl deploy"]
   fly --> machine["Fly machine<br/>eclipse-temurin:25-jre<br/>+ reader.jar"]
-  machine -->|reads/writes| pgvol[("Postgres<br/>Fly volume")]
-  machine -->|reads/writes| r2[("R2 bucket")]
+  machine -->|JDBC over TLS| neon[("Neon<br/>managed Postgres")]
+  machine -->|S3 SDK| r2[("R2 bucket")]
 ```
 
 Every step is invocable as `bb <task>` locally; CI is a thin shim.

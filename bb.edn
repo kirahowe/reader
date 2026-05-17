@@ -33,7 +33,7 @@
 
   image      {:doc     "Build a container image"
               :depends [build]
-              :task    (shell "docker" "build" "-t" "kira/reader:latest" ".")}
+              :task    (shell "docker" "build" "-t" "reader:latest" ".")}
 
   deploy     {:doc  "Deploy to fly.io"
               :task (shell "flyctl" "deploy" "--remote-only")}}}

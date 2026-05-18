@@ -20,24 +20,51 @@ scripts, and lifecycles become implicit and unreliable.
 ## Decision
 
 **Integrant** owns every lifecycle. **meta-merge** layers
-per-environment EDN onto a base config. **`deps.edn` aliases** select
-which environment overlay is on the classpath.
+per-environment EDN profiles onto a base config. **`deps.edn` aliases**
+both place the right `env/<env>/resources/` on the classpath and pass
+the profile filename to `reader.main`.
 
 ### File layout
 
 ```
-resources/base-system.edn          # base, always on the classpath
-env/dev/resources/env.edn          # dev overrides   (loaded via :dev)
-env/test/resources/env.edn         # test overrides  (loaded via :test)
-env/prod/resources/env.edn         # prod overrides  (loaded via :prod, baked into uberjar)
-env/dev/src/user.clj               # dev-only REPL helpers
+resources/base-system.edn          # base, always loaded
+env/dev/resources/dev.edn          # dev profile   (loaded via :dev)
+env/test/resources/test.edn        # test profile  (loaded via :test)
+env/prod/resources/prod.edn        # prod profile  (loaded via :prod, baked into uberjar)
+env/dev/src/user.clj               # dev-only REPL entry point
+env/dev/src/dev.clj                # dev-only integrant.repl wiring
 ```
 
-`reader.sys/load-configs` reads every classpath instance of
-`base-system.edn`, then every classpath instance of `env.edn`, and
-meta-merges them. The active `env.edn` is the one the chosen alias put
-on the classpath. There is no `READER_PROFILE` env var; the alias *is*
-the profile.
+### Loading pipeline
+
+`reader.main` exposes the loading pipeline as discrete functions:
+`load-config` reads one profile, `merge-profiles` meta-merges a list,
+`prep-config` adds `ig/load-namespaces`, and `exec-config` finishes
+with `ig/init`. `core-profiles` is the list that's always loaded
+(`base-system.edn`). An additional profile is named explicitly:
+
+- `clojure -M:dev` runs `reader.main` with `"dev.edn"` as its arg.
+- `clojure -M:prod` runs `reader.main` with `"prod.edn"`.
+- Tests call `main/prep-config` directly with the profiles they need.
+
+There is no `READER_PROFILE` env var. The profile name is the
+argument; the deps alias supplies it.
+
+### Component-namespace conventions
+
+Init-keys are organized by concern, mirroring the patterns used by the
+reference projects we drew from:
+
+- `reader.concerns.<thing>` — lifecycle/wiring keys for an external
+  technology or a Reitit subsystem (e.g. `:reader.concerns/http-kit`,
+  `:reader.concerns.reitit/{ring-handler,router,default-handler}`).
+- `reader.handlers/<name>` — one init-key per route handler, returning
+  a Ring handler fn. Routes data in `base-system.edn` wires them with
+  `#ig/ref`.
+- `reader.concerns.integrant` — EDN reader literals (`#env`, `#env/opt`,
+  `#env/long`, `#env/bool`, `#env/secret`, `#resource`) and the
+  `:reader/const` init-key. Any key meant to expose a literal value to
+  the rest of the graph derives from `:reader/const`.
 
 ### Lifecycle ownership
 
@@ -64,11 +91,13 @@ Integrant's reader:
 | `#env/long`   | Required env var, parsed as long.                      |
 | `#env/bool`   | Required env var, true for `"true"` / `"1"` / `"yes"`. |
 | `#env/secret` | Required env var, wrapped in a `Secret` whose `toString` is `<secret>`. |
+| `#resource`   | `clojure.java.io/resource` — turns a classpath path into a URL. |
 
 Each accepts a bare name or a `[name default]` vector:
 
 ```clojure
-{:reader.http/server {:port #env/long ["PORT" 8080]}}
+{:reader.concerns/http-kit
+ {:opts {:port #env/long ["PORT" 8080]}}}
 ```
 
 Configuration stays *in one place* — the EDN — even when some values
@@ -82,8 +111,9 @@ at the REPL.
 
 Tests stand up subsets of the system by handing `ig/init` a list of
 keys. The HTTP integration tests do exactly this — one suite inits
-only `:reader.http/handler` (no socket), another inits
-`:reader.http/server` on an ephemeral port for over-the-wire checks.
+only `:reader.concerns.reitit/ring-handler` (no socket), another inits
+`:reader.concerns/http-kit` on an ephemeral port for over-the-wire
+checks.
 
 Secrets cannot accidentally print themselves into a log line —
 `Secret` is a record whose `toString` returns a placeholder.

@@ -7,15 +7,17 @@
 
    `end-to-end-server-binds-and-serves` brings up the full system
    on an ephemeral port and hits it with a real HTTP client."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [deftest is testing]]
             [integrant.core :as ig]
             [org.httpkit.server :as http-kit]
-            [reader.sys :as sys])
+            [reader.main :as main])
   (:import (java.net URI)
            (java.net.http HttpClient HttpRequest HttpResponse$BodyHandlers)))
 
 (defn- prepped-config []
-  (sys/prep-config (sys/load-configs ["base-system.edn" "env.edn"])))
+  (main/prep-config [(io/resource "base-system.edn")
+                     (io/resource "test.edn")]))
 
 (defn- with-system [keys f]
   (let [system (ig/init (prepped-config) keys)]
@@ -30,9 +32,9 @@
     (.send client req (HttpResponse$BodyHandlers/ofString))))
 
 (deftest routes-via-handler
-  (with-system [:reader.http/handler]
+  (with-system [:reader.concerns.reitit/ring-handler]
     (fn [system]
-      (let [handler (:reader.http/handler system)]
+      (let [handler (:reader.concerns.reitit/ring-handler system)]
 
         (testing "GET / returns the home page"
           (let [{:keys [status headers body]} (handler {:request-method :get :uri "/"})]
@@ -57,9 +59,9 @@
             (is (= 404 status))))))))
 
 (deftest end-to-end-server-binds-and-serves
-  (with-system [:reader.http/server]
+  (with-system [:reader.concerns/http-kit]
     (fn [system]
-      (let [server (:reader.http/server system)
+      (let [server (:reader.concerns/http-kit system)
             port   (http-kit/server-port server)]
         (is (pos? port) "server bound to an ephemeral port")
 

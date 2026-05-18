@@ -1,15 +1,22 @@
-(ns user
-  (:require [integrant.repl :as ig-repl]
-            [integrant.repl.state :as state]
-            [reader.sys :as sys]))
+(ns user)
 
-(ig-repl/set-prep!
- #(-> ["base-system.edn" "env.edn"]
-      sys/load-configs
-      sys/prep-config))
+(defn help []
+  (println)
+  (println "Welcome to the reader REPL")
+  (println)
+  (println "Available commands:")
+  (println "  (dev)   ;; switch to the dev namespace (loads integrant.repl helpers)")
+  (println "  (go)    ;; start the system")
+  (println "  (halt)  ;; stop the system")
+  (println "  (reset) ;; refresh code and restart the system")
+  (println))
 
-(defn go    [] (ig-repl/go))
-(defn halt  [] (ig-repl/halt))
-(defn reset [] (ig-repl/reset))
+(defn dev
+  "Load and switch to the 'dev' namespace."
+  []
+  (require 'dev)
+  (help)
+  (in-ns 'dev)
+  :loaded)
 
-(defn system [] state/system)
+(help)

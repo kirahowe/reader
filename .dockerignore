@@ -11,6 +11,5 @@ target
 env/dev
 env/test
 test
-docker-compose.yml
 fly.toml
 docs

@@ -16,10 +16,10 @@
     (b/copy-dir {:src-dirs   (:paths b)
                  :target-dir class-dir})
     (b/compile-clj {:basis      b
-                    :ns-compile '[reader.core]
+                    :ns-compile '[reader.main]
                     :class-dir  class-dir})
     (b/uber {:class-dir class-dir
              :uber-file uber-file
              :basis     b
-             :main      'reader.core}))
+             :main      'reader.main}))
   (println "built" uber-file))

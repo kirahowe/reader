@@ -1,0 +1,5 @@
+{:reader.log/publisher
+ {:pretty? true}
+
+ :reader.concerns/http-kit
+ {:opts {:port 3000}}}

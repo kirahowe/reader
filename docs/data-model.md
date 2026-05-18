@@ -29,13 +29,13 @@ has a personal site, that's an affiliation, not a column on this table.
 
 ### `affiliations`
 Publications, blogs, podcasts, newsletters, employers, journals,
-preprint servers — any first-class *thing* an author can be associated
+preprint servers -- any first-class *thing* an author can be associated
 with.
 
 | column        | type        | notes                                                                                          |
 | ------------- | ----------- | ---------------------------------------------------------------------------------------------- |
 | `id`          | uuid PK     |                                                                                                |
-| `name`        | text        | "The Atlantic", "Stratechery", "arXiv"                                                          |
+| `name`        | text        | "The Atlantic", "Stratechery", "arXiv"                                                         |
 | `slug`        | text UK     |                                                                                                |
 | `type`        | text        | enum: `newspaper`, `magazine`, `blog`, `podcast`, `newsletter`, `journal`, `preprint`, `other` |
 | `url`         | text NULL   | canonical home page                                                                            |
@@ -66,13 +66,13 @@ table stays narrow.
 | column                | type        | notes                                                                          |
 | --------------------- | ----------- | ------------------------------------------------------------------------------ |
 | `affiliation_id`      | uuid PK,FK  | → `affiliations.id`                                                            |
-| `inbound_email_alias` | text NULL   | sender pattern (e.g. `@stratechery.com`) we use to recognize incoming issues  |
+| `inbound_email_alias` | text NULL   | sender pattern (e.g. `@stratechery.com`) we use to recognize incoming issues   |
 | `last_seen_at`        | timestamptz |                                                                                |
 
 ### Readables: three tables, not one
 
 A "readable" is anything the user can put in their queue. The three
-concrete types are independent tables — they share *no* base table —
+initial types are independent tables. They don't share a base table
 because their fields diverge enough that a shared schema would be all
 nullable columns.
 
@@ -329,8 +329,8 @@ erDiagram
 ### Why three readable tables, not one
 See the principles doc, point 9. Articles, papers, and newsletter
 issues have substantially different fields and substantially different
-sources of truth. Crushing them into one `readables` table would force
-nullable everything and bury type-discrimination logic in application
+sources of truth. Putting them all in one `readables` table would force
+many nullable columns and bury type-discrimination logic in application
 code. With three tables, every type-specific query is a `SELECT *
 FROM papers WHERE …`, every cross-cutting query is a `UNION` or a
 domain function over typed inputs.
@@ -338,11 +338,9 @@ domain function over typed inputs.
 ### Why affiliations are first-class
 An affiliation is a noun with its own identity, URL, type, and
 relationship to multiple authors and multiple publications. It outlives
-any individual article. The earliest version of this model had
-`author.email`, `author.domain`, `author.url` columns — that worked
-only as long as authors had exactly one outlet. The first multi-outlet
-author would have broken it. Modeled as a table from the start, we get
-arbitrary outlets per author and arbitrary authors per outlet for free.
+any individual article. This is modeled as a table from the start to
+accommodate authors who write for multiple outlets, which is most of them.
+We get arbitrary outlets per author and arbitrary authors per outlet for free.
 
 ### Polymorphic references, not table inheritance
 `authorships.readable_type` + `readable_id` is a polymorphic reference.
@@ -370,25 +368,14 @@ like:
  "from": "ben@stratechery.com", "subject": "…"}
 ```
 
-…and one added manually looks like:
+one found via some other blog looks like:
 
 ```json
-{"source": "manual"}
+{"source": "https://some-blog.com"}
 ```
 
 If a `via.source` value ever needs to be filtered on aggressively,
 that's a sign to pull it out into a real column.
-
-### No `content_hash`
-An earlier draft had a content-hash column for dedup. Dropped because:
-
-- canonical URL (articles), DOI/arXiv id (papers), and message-id
-  (newsletter issues) are stronger identifiers than a hash of mutable
-  body content
-- a hash invites a maintenance burden (when does it get recomputed?)
-- we don't have a use case that *needs* it
-
-If we ever do (cross-source dedup, for instance), we add it then.
 
 ### Indexes (planned for v1)
 - `authors(slug)` unique

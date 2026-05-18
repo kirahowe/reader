@@ -17,4 +17,4 @@ FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build /app/target/reader.jar /app/reader.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/reader.jar"]
+ENTRYPOINT ["java", "-jar", "/app/reader.jar", "prod.edn"]

@@ -2,10 +2,22 @@
  {:type    :console
   :pretty? false}
 
- :reader.http/handler
- {}
+ :reader.concerns.reitit/router
+ {:data
+  [["/"         {:get {:handler #ig/ref :reader.handlers/home}}]
+   ["/health"   {:get {:handler #ig/ref :reader.handlers/health}}]
+   ["/static/*" #ig/ref :reader.handlers/static]]}
 
- :reader.http/server
- {:handler #ig/ref :reader.http/handler
-  :port    8080
-  :host    "0.0.0.0"}}
+ :reader.concerns.reitit/default-handler {}
+
+ :reader.concerns.reitit/ring-handler
+ {:router          #ig/ref :reader.concerns.reitit/router
+  :default-handler #ig/ref :reader.concerns.reitit/default-handler}
+
+ :reader.handlers/home   {}
+ :reader.handlers/health {}
+ :reader.handlers/static {:root "public"}
+
+ :reader.concerns/http-kit
+ {:handler #ig/ref :reader.concerns.reitit/ring-handler
+  :opts    {:port 8080 :ip "0.0.0.0"}}}

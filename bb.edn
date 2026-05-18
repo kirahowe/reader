@@ -5,13 +5,8 @@
               :override-builtin true
               :task             (shell "clojure" "-M:dev:test")}
 
-  dev        {:doc  "Run the app with the dev overlay"
+  dev        {:doc  "Run the app with the dev profile"
               :task (shell "clojure" "-M:dev")}
-
-  infra:up   {:doc  "Start local infra (postgres + minio) via docker compose"
-              :task (shell "docker" "compose" "up" "-d")}
-
-  infra:down {:task (shell "docker" "compose" "down")}
 
   lint       {:doc  "Lint with clj-kondo"
               :task (shell "clojure" "-M:lint")}

@@ -99,17 +99,27 @@ matching `defmethod ig/halt-key!`. Each is configured once at startup
 and passed to its consumers — none of these are looked up globally
 at use-time.
 
-| Component                            | Owns                                                |
-| ------------------------------------ | --------------------------------------------------- |
-| `:reader.log/publisher`              | the mu/log publisher                                |
-| `:reader.http/handler`               | the Reitit-built Ring handler                       |
-| `:reader.http/server`                | the http-kit server (port, threads, lifecycle)      |
-| `:reader.db/datasource` *(soon)*     | the Postgres connection pool (Neon)                 |
-| `:reader.db/migrator` *(soon)*       | Migratus runner, runs once at startup               |
-| `:reader.storage/r2` *(soon)*        | the S3 SDK client wired to R2                       |
-| `:reader.cache/lru` *(soon)*         | a named core.cache instance                         |
-| `:reader.jobs/worker` *(soon)*       | a core.async loop draining the `jobs` table         |
-| `:reader.inbound/parser` *(soon)*    | email parsing pipeline                              |
+| Component                                    | Owns                                                |
+| -------------------------------------------- | --------------------------------------------------- |
+| `:reader.log/publisher`                      | the mu/log publisher                                |
+| `:reader.concerns/http-kit`                  | the http-kit server (port, host, lifecycle)         |
+| `:reader.concerns.reitit/ring-handler`       | the assembled Ring handler                          |
+| `:reader.concerns.reitit/router`             | the Reitit router, with routes data from EDN        |
+| `:reader.concerns.reitit/default-handler`    | unmatched-route handling (404/405/trailing-slash)   |
+| `:reader.handlers/home`                      | `GET /` — landing page                              |
+| `:reader.handlers/health`                    | `GET /health` — liveness probe                      |
+| `:reader.handlers/static`                    | `GET /static/*` — classpath resource handler        |
+| `:reader.db/datasource` *(soon)*             | the Postgres connection pool (Neon)                 |
+| `:reader.db/migrator` *(soon)*               | Migratus runner, runs once at startup               |
+| `:reader.storage/r2` *(soon)*                | the S3 SDK client wired to R2                       |
+| `:reader.cache/lru` *(soon)*                 | a named core.cache instance                         |
+| `:reader.jobs/worker` *(soon)*               | a core.async loop draining the `jobs` table         |
+| `:reader.inbound/parser` *(soon)*            | email parsing pipeline                              |
+
+`concerns/` (server, router, default-handler) cover library-specific glue code,
+and `handlers/` (one ig key per route handler) are our app/domain-specific code.
+Routes data lives in EDN — each leaf is an `#ig/ref` to a handler key, adding a
+route is a config change plus a handler init-key, not a router edit.
 
 ## Request lifecycle: typical page render
 
@@ -164,7 +174,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  dev["Local dev<br/>bb dev<br/>docker compose"] -->|git push| gh["GitHub"]
+  dev["Local dev<br/>bb dev"] -->|git push| gh["GitHub"]
   gh -->|on push to main| ga["GitHub Actions<br/>bb ci"]
   ga -->|on green| fly["flyctl deploy"]
   fly --> machine["Fly machine<br/>eclipse-temurin:25-jre<br/>+ reader.jar"]

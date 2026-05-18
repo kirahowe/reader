@@ -24,7 +24,7 @@ holding any passwords.
 | Runtime               | `eclipse-temurin:25-jre` (Java 25 LTS)             |
 | CI                    | GitHub Actions, a thin shim over `bb` tasks        |
 | Tasks                 | Babashka (`bb.edn`)                                |
-| Local infra           | docker-compose (Postgres + MinIO)                  |
+| Local infra           | testcontainers, lifecycled by Integrant (when DB lands) |
 | Migrations            | Migratus                                           |
 
 ### Neon for Postgres
@@ -80,10 +80,9 @@ verifies it on each request, and maps the subject to a `users` row by
 ### `bb.edn` for tasks
 
 Every developer-facing operation is a `bb <task>`: `dev`, `test`,
-`lint`, `fmt`, `build`, `image`, `deploy`, `infra:up`, `infra:down`.
-One language across server, build, and tasks. CI is a thin shim that
-runs `bb ci`; switching CI providers later is a YAML change, not a
-rewrite.
+`lint`, `fmt`, `build`, `image`, `deploy`. One language across server,
+build, and tasks. CI is a thin shim that runs `bb ci`; switching CI
+providers later is a YAML change, not a rewrite.
 
 Anything more complex than a one-liner graduates to a Clojure function
 called from `bb.edn`. No shell scripts. No Makefile.
@@ -100,5 +99,8 @@ There is no in-house operational surface: no databases to back up by
 hand, no SMTP server, no password hashing, no secret rotation
 beyond the platforms' own UIs.
 
-Local development matches production through `docker-compose`
-(Postgres) and MinIO (R2's S3 API). No "works on my machine" gap.
+Local development will match production through testcontainers — the
+same Postgres image and an S3-compatible blob store (MinIO via
+testcontainers) brought up as Integrant components in the dev profile
+when those consumers land. No `docker-compose` step, no globally
+running services, no "works on my machine" gap.

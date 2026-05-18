@@ -14,14 +14,14 @@
  :aliases
  {:dev    {:extra-paths ["env/dev/src" "env/dev/resources"]
            :extra-deps  {integrant/repl {:mvn/version "0.5.1"}}
-           :main-opts   ["-m" "reader.core"]}
+           :main-opts   ["-m" "reader.main" "dev.edn"]}
 
   :test   {:extra-paths ["test" "env/test/resources"]
            :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
            :main-opts   ["-m" "kaocha.runner"]}
 
   :prod   {:extra-paths ["env/prod/resources"]
-           :main-opts   ["-m" "reader.core"]}
+           :main-opts   ["-m" "reader.main" "prod.edn"]}
 
   :lint   {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.04.15"}}
            :main-opts    ["-m" "clj-kondo.main" "--lint" "src" "test" "env"]}

@@ -34,16 +34,20 @@ Postgres becomes the source of truth for everything that's not a blob.
   `queue_items`, `jobs`.
 - `reader.db.queries` — HoneySQL-based read/write helpers per
   domain. No raw SQL outside this layer.
-- Local Postgres via `bb infra:up`; Neon for everything else.
+- `:reader.dev.infra/postgres` — testcontainers-managed Postgres,
+  started by Integrant in the dev profile (and in tests). No
+  separate `compose up` step; Docker is the only host prerequisite.
+- `bb db:seed` — populates a freshly-started DB with realistic
+  fixtures so the queue, reader view, and ingestion paths have
+  something to work against.
 
 **Done when**
 - Migrations apply against an empty database and produce the v1
   schema.
 - Round-trip integration tests cover insert/select/update for every
-  table, run against a real Postgres (testcontainers in CI, local
-  compose in dev).
-- The base Integrant config wires the datasource and migrator;
-  `bb dev` boots cleanly against `bb infra:up`.
+  table, run against a real Postgres (testcontainers throughout).
+- `bb dev` boots cleanly with no manual infra step; the dev profile
+  brings up Postgres as an Integrant component.
 
 ---
 

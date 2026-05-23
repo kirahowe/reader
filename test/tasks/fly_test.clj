@@ -157,6 +157,8 @@
 (defn- run-bb-with-isolated-path
   "Spawn `bb` with PATH set to a temp dir containing only a symlink to
    `bb` itself, so any other CLI (flyctl, docker, etc.) is unreachable.
+   `/usr/bin` is deliberately *not* on PATH: docker ships there on
+   Ubuntu CI runners, which would defeat the docker-missing test.
    Returns {:exit :out :err}."
   [& bb-args]
   (let [tmp (fs/create-temp-dir)]
@@ -164,7 +166,7 @@
       (fs/create-sym-link (fs/path tmp "bb") (bb-on-path))
       (let [result (apply p/shell
                           {:out :string :err :string :continue true
-                           :extra-env {"PATH" (str tmp ":/usr/bin")}}
+                           :extra-env {"PATH" (str tmp)}}
                           "bb" bb-args)]
         (select-keys result [:exit :out :err]))
       (finally (fs/delete-tree tmp)))))

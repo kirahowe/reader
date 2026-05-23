@@ -24,7 +24,7 @@
            :main-opts   ["-m" "reader.main" "prod.edn"]}
 
   :lint   {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.04.15"}}
-           :main-opts    ["-m" "clj-kondo.main" "--lint" "src" "test" "env"]}
+           :main-opts    ["-m" "clj-kondo.main" "--lint" "src" "test" "env" "tasks"]}
 
   :cljfmt {:replace-deps {dev.weavejester/cljfmt {:mvn/version "0.16.4"}}
            :main-opts    ["-m" "cljfmt.main"]}

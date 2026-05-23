@@ -1,4 +1,4 @@
-app = "reader"
+app = "kirahowe-reader"
 primary_region = "yyz"
 
 [build]

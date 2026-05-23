@@ -10,11 +10,11 @@ COPY deps.edn build.clj ./
 RUN clojure -P -T:build
 COPY src ./src
 COPY resources ./resources
-COPY env/prod ./env/prod
 RUN clojure -T:build uberjar
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build /app/target/reader.jar /app/reader.jar
+COPY env/prod/resources /app/conf
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/reader.jar", "prod.edn"]
+ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar", "reader.main", "prod.edn"]

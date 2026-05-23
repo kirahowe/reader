@@ -5,7 +5,7 @@
 (def uber-file "target/reader.jar")
 
 (defn- basis []
-  (b/create-basis {:project "deps.edn" :aliases [:prod]}))
+  (b/create-basis {:project "deps.edn"}))
 
 (defn clean [_]
   (b/delete {:path "target"}))
@@ -13,7 +13,7 @@
 (defn uberjar [_]
   (clean nil)
   (let [b (basis)]
-    (b/copy-dir {:src-dirs   (:paths b)
+    (b/copy-dir {:src-dirs   ["src" "resources"]
                  :target-dir class-dir})
     (b/compile-clj {:basis      b
                     :ns-compile '[reader.main]

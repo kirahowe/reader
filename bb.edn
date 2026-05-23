@@ -1,34 +1,67 @@
-{:tasks
- {:requires ([babashka.process :refer [shell]])
+{:paths ["tasks" "test"]
 
-  repl       {:doc              "Start a Clojure REPL with dev + test on the classpath"
-              :override-builtin true
-              :task             (shell "clojure" "-M:dev:test")}
+ :tasks
+ {:requires ([depends :as dep]
+             [fly])
 
-  dev        {:doc  "Run the app with the dev profile"
-              :task (shell "clojure" "-M:dev")}
+  ;; --- dependency checks (private; hidden from `bb tasks`) ---
 
-  lint       {:doc  "Lint with clj-kondo"
-              :task (shell "clojure" "-M:lint")}
+  flyctl:installed
+  {:private true
+   :task    (dep/require-cli! "flyctl" "https://fly.io/docs/flyctl/install/")}
 
-  fmt        {:doc  "Check formatting with cljfmt"
-              :task (shell "clojure" "-M:cljfmt" "check")}
+  flyctl:authed
+  {:private true
+   :depends [flyctl:installed]
+   :task    (fly/require-authed!)}
 
-  fmt:fix    {:doc  "Fix formatting with cljfmt"
-              :task (shell "clojure" "-M:cljfmt" "fix")}
+  fly:app-exists
+  {:private true
+   :depends [flyctl:authed]
+   :task    (fly/require-app! (fly/default-app-name) "Run `bb fly:init` to create it")}
 
-  test       {:doc  "Run tests with kaocha"
-              :task (shell "clojure" "-M:test")}
+  docker:installed
+  {:private true
+   :task    (dep/require-cli! "docker" "https://docs.docker.com/get-docker/")}
 
-  ci         {:doc     "Lint + fmt-check + tests"
-              :depends [lint fmt test]}
+  ;; --- user-facing tasks ---
 
-  build      {:doc  "Build an uberjar"
-              :task (shell "clojure" "-T:build" "uberjar")}
+  repl     {:doc              "Start a Clojure REPL with dev + test on the classpath"
+            :override-builtin true
+            :task             (dep/sh! "clojure" "-M:dev:test")}
 
-  image      {:doc     "Build a container image"
-              :depends [build]
-              :task    (shell "docker" "build" "-t" "reader:latest" ".")}
+  dev      {:doc  "Run the app with the dev profile"
+            :task (dep/sh! "clojure" "-M:dev")}
 
-  deploy     {:doc  "Deploy to fly.io"
-              :task (shell "flyctl" "deploy" "--remote-only")}}}
+  lint     {:doc  "Lint with clj-kondo"
+            :task (dep/sh! "clojure" "-M:lint")}
+
+  fmt      {:doc  "Check formatting with cljfmt"
+            :task (dep/sh! "clojure" "-M:cljfmt" "check")}
+
+  fmt:fix  {:doc  "Fix formatting with cljfmt"
+            :task (dep/sh! "clojure" "-M:cljfmt" "fix")}
+
+  test     {:doc  "Run tests with kaocha"
+            :task (dep/sh! "clojure" "-M:test")}
+
+  test:tasks {:doc  "Run tests for the bb task infrastructure"
+              :task ((requiring-resolve 'test-runner/run-tests))}
+
+  ci       {:doc     "Lint + fmt-check + all tests"
+            :depends [lint fmt test test:tasks]}
+
+  build    {:doc  "Build an uberjar"
+            :task (dep/sh! "clojure" "-T:build" "uberjar")}
+
+  image    {:doc     "Build a container image"
+            :depends [docker:installed build]
+            :task    (dep/sh! "docker" "build" "-t" "reader:latest" ".")}
+
+  deploy   {:doc     "Deploy to fly.io"
+            :depends [fly:app-exists]
+            :task    (dep/sh! "flyctl" "deploy" "--remote-only")}
+
+  fly:init {:doc     "Create the Fly.io app for this project (one-time setup)"
+            :depends [flyctl:authed]
+            :task    (fly/init!)}}}

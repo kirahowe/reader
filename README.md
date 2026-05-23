@@ -78,8 +78,22 @@ To manually deploy the app:
 bb deploy   # flyctl deploy --remote-only
 ```
 
-You'll need [`flyctl`](https://fly.io/docs/flyctl/install/) installed
-and authenticated (`flyctl auth login`) against the `reader` app.
+`bb deploy` depends on `flyctl` being installed, logged in, and the
+Fly app already existing. If any of those are missing the task runner
+should give you an actionable hint to help get unstuck.
+
+### One-time Fly.io setup
+
+Fly app names are globally unique across the entire platform, so
+the default `reader` is almost certainly taken. Edit `fly.toml`'s
+`app = "..."` to something namespaced to you (e.g.
+`kirahowe-reader`) first, then:
+
+```sh
+flyctl auth login   # if not already
+bb fly:init         # create the Fly app named in fly.toml
+bb deploy
+```
 
 ### Configuration
 

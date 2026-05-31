@@ -2,4 +2,5 @@
            :unused-binding     {:level :warning}
            :unused-referred-var {:level :warning}}
  :lint-as {integrant.core/init-key  clojure.core/defmulti
-           integrant.core/halt-key! clojure.core/defmulti}}
+           integrant.core/halt-key! clojure.core/defmulti}
+ :hooks   {:analyze-call {reader.test-support.setup/with-system hooks.with-system/with-system}}}

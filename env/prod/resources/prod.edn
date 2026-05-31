@@ -1,2 +1,30 @@
 {:reader.concerns/http-kit
- {:opts {:port #env/long ["PORT" 8080]}}}
+ {:opts {:port #env/long ["PORT" 8080]}}
+
+ ;; Prod supplies its own datasource spec instead of the dev/test
+ ;; embedded-postgres fragment. `DATABASE_URL` is the full Neon JDBC
+ ;; URL, credentials and `?sslmode=require` included.
+ ;;
+ ;; Tuned to let Neon autosuspend (scale to zero) while the app is in
+ ;; development with a handful of test users — optimizing for cost over
+ ;; latency. `minimum-idle 0` lets the pool drain fully so no held
+ ;; connection keeps the compute awake; a short `idle-timeout` releases
+ ;; connections quickly; the longer `connection-timeout` absorbs the
+ ;; cold-start delay when the first request after a suspend wakes Neon.
+ ;; If real traffic arrives, flip to a fixed-size pool (minimum-idle =
+ ;; maximum-pool-size) to trade cost for latency.
+ :reader.db/datasource
+ {:spec {:jdbc-url           #env "DATABASE_URL"
+         :pool-name          "reader-pool"
+         :maximum-pool-size  10
+         :minimum-idle       0
+         :connection-timeout 30000
+         :idle-timeout       30000
+         :max-lifetime       300000}}
+
+ ;; Apply pending migrations on boot. Nothing refs this key yet, but
+ ;; Integrant still inits it, so a fresh Neon database is migrated the
+ ;; first time the machine starts.
+ :reader.db/migrator
+ {:datasource      #ig/ref :reader.db/datasource
+  :migrations-path "migrations"}}

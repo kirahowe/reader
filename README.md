@@ -22,33 +22,122 @@ Fly.io) with the domain features still to come. See
 - [Clojure CLI](https://clojure.org/guides/install_clojure) (Java 25)
 - [Babashka](https://babashka.org/)
 
-Docker isn't needed yet. Once the data layer lands, local Postgres and
-R2 will be lifecycled by Integrant via
-[testcontainers](https://java.testcontainers.org/) — Docker becomes a
-runtime dependency at that point, not a separate `compose up` step.
+No Docker, no local Postgres install. The dev profile lifecycles an
+[embedded-postgres](https://github.com/zonkyio/embedded-postgres) under
+Integrant — same in tests. A real Postgres (Neon) ships only in prod.
 
 ## Run it locally
 
-Start a REPL with the `dev` alias and run 
-
-```clojure
-(dev)
-(go)
+```sh
+bb dev
 ```
 
-The app will be available at http://localhost:3000 (or whatever port
-is configured in `dev.edn`).
+Brings up the dev Integrant system: the embedded Postgres, the
+HikariCP-pooled datasource, the Migratus migrator (applies every
+pending migration on start), http-kit on `:3000`, and an nREPL server
+on `:7888` so editors and other tools can talk to the running JVM.
+
+In another terminal, populate it with realistic fixtures:
+
+```sh
+bb db:seed
+```
+
+See [Database](#database) for what that loads, how migrations apply,
+and how to set up Neon for prod.
 
 Other useful tasks (run `bb tasks` for the full list):
 
-| Task           | What it does                                  |
-| -------------- | --------------------------------------------- |
-| `bb lint`      | clj-kondo over `src`, `test`, `env`           |
-| `bb fmt`       | cljfmt check                                  |
-| `bb fmt:fix`   | cljfmt fix                                    |
-| `bb ci`        | lint + fmt-check + tests (what CI runs)       |
-| `bb build`     | build the production uberjar                  |
-| `bb image`     | build a `reader:latest` container image       |
+| Task           | What it does                                          |
+| -------------- | ----------------------------------------------------- |
+| `bb dev`       | run the dev app + nREPL on `:7888`                    |
+| `bb db:seed`   | populate the running dev db with realistic fixtures   |
+| `bb lint`      | clj-kondo over `src`, `test`, `env`                   |
+| `bb fmt`       | cljfmt check                                          |
+| `bb fmt:fix`   | cljfmt fix                                            |
+| `bb ci`        | lint + fmt-check + tests (what CI runs)               |
+| `bb build`     | build the production uberjar                          |
+| `bb image`     | build a `reader:latest` container image               |
+
+## Database
+
+Reader runs on Postgres in every environment. Locally there is nothing
+to install — dev and tests lifecycle an embedded Postgres under
+Integrant. Prod points at a [Neon](https://neon.tech) database.
+
+The schema is owned by the migrations in
+[`resources/migrations/`](resources/migrations/). The
+`:reader.db/migrator` component applies every pending migration on
+startup, so a freshly created database is brought fully up to date the
+first time the system boots — there is no separate "run migrations"
+step in any environment.
+
+### Dev and test (embedded)
+
+`bb dev` starts an embedded Postgres on an ephemeral port, opens a
+HikariCP pool against it, and applies migrations — no Docker, no local
+Postgres, no setup. Tests do the same per system against a throwaway
+database. First run unpacks the Postgres binary into
+`~/.embedded-postgres-binaries` (~1.5s); later runs are warm.
+
+Populate the running dev database with fixtures:
+
+```sh
+bb db:seed
+```
+
+This truncates the seeded tables and reinserts a coherent set —
+authors, affiliations, articles, papers, a newsletter issue,
+authorships, and a user with a queue and a couple of jobs. It is
+idempotent and runs over nREPL into the system `bb dev` already
+started, so the seed lands in the database the dev server is serving,
+with no second JVM.
+
+To inspect the dev database directly, grab its JDBC URL from the
+running system — the port is ephemeral, so it changes each run. Either
+read it from the `bb dev` logs:
+
+```
+reader.dev.infra.postgres ::started :port <PORT>
+```
+
+```sh
+psql "postgresql://postgres:postgres@localhost:<PORT>/postgres"
+```
+
+or pull it from a REPL connected to nREPL on `:7888`:
+
+```clojure
+(:jdbc-url (:reader.dev.infra/postgres integrant.repl.state/system))
+```
+
+### Production (Neon)
+
+Prod connects to Neon through a single `DATABASE_URL` environment
+variable — the full JDBC URL, credentials and SSL mode included. One
+time setup:
+
+1. Create a Neon project (pick a region close to `yyz` to keep latency
+   down). Neon provisions a database and a role for you.
+2. Copy the connection string from the Neon dashboard and put it in
+   JDBC form — prefix `jdbc:` and keep `?sslmode=require`, since Neon
+   requires TLS:
+
+   ```
+   jdbc:postgresql://<user>:<password>@<host>.neon.tech/<db>?sslmode=require
+   ```
+
+3. Hand it to the app as a Fly secret (never commit it):
+
+   ```sh
+   flyctl secrets set DATABASE_URL="jdbc:postgresql://…?sslmode=require"
+   ```
+
+That is all the database wiring prod needs. On the next deploy the
+machine boots, `:reader.db/datasource` opens a pool against Neon, and
+`:reader.db/migrator` applies any pending migrations before the app
+serves traffic. `DATABASE_URL` is required in prod — the system
+refuses to start without it rather than coming up half-wired.
 
 ## Deployment
 
@@ -108,8 +197,10 @@ env/test/resources/test.edn        # bb test
 env/prod/resources/prod.edn        # baked into the uberjar
 ```
 
-The few values that must come from the environment (port, secrets)
-are pulled in inline via reader literals like `#env/long ["PORT" 8080]`.
+The few values that must come from the environment — the HTTP `PORT`,
+and in prod the `DATABASE_URL` Neon connection string — are pulled in
+inline via reader literals like `#env/long ["PORT" 8080]` and
+`#env "DATABASE_URL"`.
 
 ## Useful docs
 

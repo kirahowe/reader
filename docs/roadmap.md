@@ -20,34 +20,40 @@ Integrant lifecycle, vanilla CSS, and a passing test suite.
 
 ---
 
-## Step 2 — Data layer
+## Step 2 — Data layer ✅
 
 Postgres becomes the source of truth for everything that's not a blob.
 
 **Components**
-- `:reader.db/datasource` — connection pool (HikariCP via next.jdbc)
-- `:reader.db/migrator` — Migratus, runs on startup
-- `resources/migrations/` — SQL migrations creating every table from
+- `:reader.db/datasource` — HikariCP-pooled `DataSource` via next.jdbc
+- `:reader.db/migrator` — Migratus, applies every pending migration at
+  startup
+- `resources/migrations/` — SQL migration creating the v1 schema from
   [data-model.md](./data-model.md): `authors`, `affiliations`,
   `author_affiliations`, `newsletter_sources`, `articles`, `papers`,
   `newsletter_issues`, `authorships`, `users`, `email_inboxes`,
   `queue_items`, `jobs`.
-- `reader.db.queries` — HoneySQL-based read/write helpers per
-  domain. No raw SQL outside this layer.
-- `:reader.dev.infra/postgres` — testcontainers-managed Postgres,
-  started by Integrant in the dev profile (and in tests). No
-  separate `compose up` step; Docker is the only host prerequisite.
-- `bb db:seed` — populates a freshly-started DB with realistic
-  fixtures so the queue, reader view, and ingestion paths have
-  something to work against.
+- `reader.db.crud` — generic, data-driven CRUD over any table via
+  HoneySQL (`by-id`, `find-many`, `find-1`, `create!`, `update!`,
+  `delete!`). No protocols, no records, no ORM-flavored escape hatches.
+  Tables that need real domain logic get their own namespace.
+- `reader.db.types` — global next.jdbc extensions so Clojure maps and
+  vectors marshal into Postgres `jsonb`, and `java.time.Instant` binds
+  as `timestamptz`.
+- `reader.authorships` — polymorphic FK validator for the
+  readable→author bridge (postgres can't enforce it).
+- `reader.jobs` — durable job queue with `enqueue!`, `claim-next!`
+  (atomic via `SELECT … FOR UPDATE SKIP LOCKED`), `complete!`, `fail!`.
+- `:reader.dev.infra/postgres` — embedded-postgres lifecycle, started
+  by Integrant in dev and tests. No Docker, no `compose up` — same
+  Postgres binary for both. Lives in `infra/src/` so it stays out of
+  the prod uberjar.
+- `bb db:seed` — populates the running dev database with realistic
+  fixtures over nREPL, against the same JVM `bb dev` is using.
 
-**Done when**
-- Migrations apply against an empty database and produce the v1
-  schema.
-- Round-trip integration tests cover insert/select/update for every
-  table, run against a real Postgres (testcontainers throughout).
-- `bb dev` boots cleanly with no manual infra step; the dev profile
-  brings up Postgres as an Integrant component.
+**Done.** Schema migrations apply cleanly, every CRUD-only table has
+a round-trip integration test (real embedded Postgres), and `bb dev`
+boots with the db wired and nREPL listening on `:7888`.
 
 ---
 

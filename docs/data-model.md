@@ -15,17 +15,30 @@ The humans (or pseudonymous bylines) who wrote things.
 
 | column      | type        | notes                                    |
 | ----------- | ----------- | ---------------------------------------- |
-| `id`        | uuid PK     |                                          |
-| `name`      | text        | display name                             |
-| `sort_name` | text        | for "Last, First" indexing               |
-| `slug`      | text UK     | URL slug                                 |
-| `bio`       | text NULL   |                                          |
-| `created_at`| timestamptz |                                          |
-| `updated_at`| timestamptz |                                          |
+| `id`        | uuid PK       |                                          |
+| `name`      | text          | display name                             |
+| `sort_name` | text NULL     | optional "Last, First" collation key     |
+| `slug`      | text UK       | URL slug                                 |
+| `bio`       | text NULL     |                                          |
+| `created_at`| timestamptz   |                                          |
+| `updated_at`| timestamptz   |                                          |
 
 Notably: **no `email`, no `domain`, no `url`**. Most authors we ingest
 will be people we never have direct contact details for. If an author
 has a personal site, that's an affiliation, not a column on this table.
+
+**`sort_name` is nullable on purpose.** Authors mostly arrive as a single
+scraped byline string, and "First Last" → "Last, First" can't be inferred
+reliably for mononyms, organizations, particles ("van", "de"), or
+non-Western name orders. So `reader.authors/create!` only derives a
+sort key for *unambiguous* two-part names and leaves the rest NULL.
+Ordering uses `COALESCE(sort_name, name)`, so a NULL just sorts by display
+name — a fine default. A manually supplied `sort_name` always overrides
+the heuristic.
+
+TODO (UI, later): let the user edit `sort_name`, and surface authors whose
+`sort_name` is NULL so they can fill one in for nicer surname-first
+browsing.
 
 ### `affiliations`
 Publications, blogs, podcasts, newsletters, employers, journals,
@@ -55,8 +68,12 @@ Many-to-many between authors and affiliations.
 | `ends_on`        | date NULL   |                                                    |
 | `is_primary`     | boolean     | which affiliation we display by default            |
 
-Primary key is `(author_id, affiliation_id, starts_on)` so the same
-author can have multiple discrete stints at the same publication.
+Conceptually keyed on `(author_id, affiliation_id, starts_on)` so the
+same author can have multiple discrete stints at the same publication.
+A synthetic `id uuid` PK does the actual job because Postgres forbids
+NULL in PK columns and `starts_on` is nullable; uniqueness on the
+conceptual tuple is enforced via `UNIQUE NULLS NOT DISTINCT
+(author_id, affiliation_id, starts_on)`.
 
 ### `newsletter_sources`
 A 1:1 extension table on `affiliations` where `type = 'newsletter'`,
@@ -138,7 +155,8 @@ side: `readable_type` is `'article'` / `'paper'` / `'newsletter_issue'`,
 | `ordinal`           | int         | byline order                       |
 | `contribution_type` | text NULL   | "primary", "co-author", "editor", …|
 
-There is a partial index per readable type for efficient lookups.
+A composite index on `(readable_type, readable_id)` serves both the
+"who wrote X" lookup and any type-filtered scan via prefix.
 
 ### `users`
 End users of the reader. v1 supports a single self-hosted user, but the

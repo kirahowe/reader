@@ -109,8 +109,9 @@ at use-time.
 | `:reader.handlers/home`                      | `GET /` — landing page                              |
 | `:reader.handlers/health`                    | `GET /health` — liveness probe                      |
 | `:reader.handlers/static`                    | `GET /static/*` — classpath resource handler        |
-| `:reader.db/datasource` *(soon)*             | the Postgres connection pool (Neon)                 |
-| `:reader.db/migrator` *(soon)*               | Migratus runner, runs once at startup               |
+| `:reader.db/datasource`                      | HikariCP-pooled Postgres `DataSource`               |
+| `:reader.db/migrator`                        | Migratus runner — applies pending migrations at startup |
+| `:reader.dev.infra/postgres` *(dev/test)*    | embedded-postgres lifecycle, provides the JDBC spec |
 | `:reader.storage/r2` *(soon)*                | the S3 SDK client wired to R2                       |
 | `:reader.cache/lru` *(soon)*                 | a named core.cache instance                         |
 | `:reader.jobs/worker` *(soon)*               | a core.async loop draining the `jobs` table         |

@@ -1,0 +1,19 @@
+;; Database wiring for any environment that runs Reader against an
+;; embedded Postgres (dev, tests, …). A profile that wants a different
+;; backend (a Neon branch, a hosted prod db) skips this fragment and
+;; supplies its own :reader.db/datasource :spec.
+;;
+;; Convention: consumers that need the database at startup should
+;; `#ig/ref :reader.db/migrator` rather than `:reader.db/datasource`.
+;; The migrator key resolves to the same pool but guarantees migrations
+;; have applied first — without that ref, Integrant is free to start a
+;; consumer in parallel with the migrator and the consumer can race.
+
+{:reader.dev.infra/postgres {}
+
+ :reader.db/datasource
+ {:spec #ig/ref :reader.dev.infra/postgres}
+
+ :reader.db/migrator
+ {:datasource      #ig/ref :reader.db/datasource
+  :migrations-path "migrations"}}

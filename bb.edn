@@ -1,7 +1,8 @@
 {:paths ["tasks" "test"]
 
  :tasks
- {:requires ([depends :as dep]
+ {:requires ([db]
+             [depends :as dep]
              [fly])
 
   ;; --- dependency checks (private; hidden from `bb tasks`) ---
@@ -44,6 +45,9 @@
 
   test     {:doc  "Run tests with kaocha"
             :task (dep/sh! "clojure" "-M:test")}
+
+  db:seed  {:doc  "Populate the running dev database via nREPL (needs `bb dev`)"
+            :task (db/seed!)}
 
   test:tasks {:doc  "Run tests for the bb task infrastructure"
               :task ((requiring-resolve 'test-runner/run-tests))}

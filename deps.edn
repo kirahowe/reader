@@ -16,7 +16,7 @@
         com.zaxxer/HikariCP                {:mvn/version "6.3.0"}
         org.postgresql/postgresql          {:mvn/version "42.7.7"}
         migratus/migratus                  {:mvn/version "1.6.6"}
-        metosin/jsonista                   {:mvn/version "1.0.0"}}
+        com.cnuernber/charred             {:mvn/version "1.038"}}
 
  :aliases
  {:dev    {:extra-paths ["env/dev/src" "env/dev/resources" "infra/src" "infra/resources"]

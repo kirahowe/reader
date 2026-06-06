@@ -34,8 +34,13 @@ bb dev
 
 Brings up the dev Integrant system: the embedded Postgres, the
 HikariCP-pooled datasource, the Migratus migrator (applies every
-pending migration on start), http-kit on `:3000`, and an nREPL server
-on `:7888` so editors and other tools can talk to the running JVM.
+pending migration on start), http-kit on `:3000`, and a cider-nrepl
+server on an OS-assigned port. That port is advertised in `.nrepl-port`
+so editors and other tools can discover and connect to the running JVM
+— nothing hardcodes a port.
+
+`bb dev` cooperates with a REPL you've already started instead of
+fighting it (see [Editor & REPL](#editor--repl)).
 
 In another terminal, populate it with realistic fixtures:
 
@@ -50,7 +55,7 @@ Other useful tasks (run `bb tasks` for the full list):
 
 | Task           | What it does                                          |
 | -------------- | ----------------------------------------------------- |
-| `bb dev`       | run the dev app + nREPL on `:7888`                    |
+| `bb dev`       | run the dev system (reuses a running REPL if one is up) |
 | `bb db:seed`   | populate the running dev db with realistic fixtures   |
 | `bb lint`      | clj-kondo over `src`, `test`, `env`                   |
 | `bb fmt`       | cljfmt check                                          |
@@ -58,6 +63,42 @@ Other useful tasks (run `bb tasks` for the full list):
 | `bb ci`        | lint + fmt-check + tests (what CI runs)               |
 | `bb build`     | build the production uberjar                          |
 | `bb image`     | build a `reader:latest` container image               |
+
+## Editor & REPL
+
+In Clojure the REPL is the place to do everything, so the dev system is
+designed to live in one running JVM that both your editor and the bb
+tasks attach to. Discovery goes through the conventional `.nrepl-port`
+file: whoever starts the nREPL writes it, everyone else reads it. That
+means the two ways interact in either order:
+
+- **`bb dev` first, editor second.** `bb dev` boots the system and
+  starts a cider-nrepl server, writing its (OS-assigned) port to
+  `.nrepl-port`. In your editor, **connect to a running REPL** (Calva:
+  "Connect to a Running REPL"; CIDER: `cider-connect-clj`) — it reads
+  `.nrepl-port` and attaches. cider-nrepl is on the server's classpath,
+  so you get the full editor experience over the connection, not a
+  bare socket.
+
+- **Editor first, `bb dev` second.** Jack in from your editor **with
+  the `:dev` alias** (it carries `integrant.repl`, embedded-postgres,
+  and the `dev` ns). Then `bb dev` notices the advertised `.nrepl-port`,
+  and instead of starting a competing JVM it boots the system *inside
+  your editor's REPL* over nREPL and exits — no second http server, no
+  second embedded Postgres. Re-running `bb dev` when the system is
+  already up is a no-op.
+
+Either way, `bb db:seed` attaches to the same `.nrepl-port`, so it
+seeds whichever system is live.
+
+Two caveats worth knowing:
+
+- There is a single `.nrepl-port` file, so if you run `bb dev` **and**
+  an editor REPL at once, the last one to start owns the file. In
+  practice you run one or the other.
+- The editor-first path needs the `:dev` alias on the REPL's classpath.
+  Jack in without it and `bb dev` will tell you so rather than failing
+  obscurely.
 
 ## Database
 
@@ -89,9 +130,11 @@ bb db:seed
 This truncates the seeded tables and reinserts a coherent set —
 authors, affiliations, articles, papers, a newsletter issue,
 authorships, and a user with a queue and a couple of jobs. It is
-idempotent and runs over nREPL into the system `bb dev` already
-started, so the seed lands in the database the dev server is serving,
-with no second JVM.
+idempotent and runs over nREPL into the system already running: it
+finds the server through `.nrepl-port` and evals against
+`integrant.repl.state/system`, so the seed lands in the database the
+dev server is serving, with no second JVM — whether that system is one
+`bb dev` started or one in your editor REPL.
 
 To inspect the dev database directly, grab its JDBC URL from the
 running system — the port is ephemeral, so it changes each run. Either
@@ -105,7 +148,7 @@ reader.dev.infra.postgres ::started :port <PORT>
 psql "postgresql://postgres:postgres@localhost:<PORT>/postgres"
 ```
 
-or pull it from a REPL connected to nREPL on `:7888`:
+or pull it from a connected REPL:
 
 ```clojure
 (:jdbc-url (:reader.dev.infra/postgres integrant.repl.state/system))
@@ -192,7 +235,7 @@ top:
 
 ```
 resources/base-system.edn          # defaults, always loaded
-env/dev/resources/dev.edn          # bb dev → -m reader.main dev.edn
+env/dev/resources/dev.edn          # bb dev → -m reader.dev.main
 env/test/resources/test.edn        # bb test
 env/prod/resources/prod.edn        # baked into the uberjar
 ```

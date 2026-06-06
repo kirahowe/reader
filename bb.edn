@@ -3,6 +3,7 @@
  :tasks
  {:requires ([db]
              [depends :as dep]
+             [dev-task]
              [fly])
 
   ;; --- dependency checks (private; hidden from `bb tasks`) ---
@@ -31,8 +32,8 @@
             :override-builtin true
             :task             (dep/sh! "clojure" "-M:dev:test")}
 
-  dev      {:doc  "Run the app with the dev profile"
-            :task (dep/sh! "clojure" "-M:dev")}
+  dev      {:doc  "Run the dev system; reuses a running REPL if one is up"
+            :task (dev-task/dev!)}
 
   lint     {:doc  "Lint with clj-kondo"
             :task (dep/sh! "clojure" "-M:lint")}

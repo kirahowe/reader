@@ -1,47 +1,16 @@
 (ns db
-  "Babashka tasks that talk to the running dev system over nREPL. Uses
-   bencode (bundled with bb) directly, no client dep."
-  (:require [bencode.core :as bencode]
-            [clojure.java.io :as io]
-            [clojure.string :as str])
-  (:import (java.io PushbackInputStream)
-           (java.net Socket)))
-
-(def ^:private nrepl-port 7888)
+  "Babashka tasks that talk to the running dev system over nREPL. The
+   server is discovered via `.nrepl-port` (see `repl`), so `bb db:seed`
+   lands in whatever REPL is live — `bb dev` or the editor you jacked
+   in to — with no second JVM and no hardcoded port."
+  (:require [clojure.string :as str]
+            [repl]))
 
 (def ^:private seed-expr
   "(do (require 'reader.dev.seed 'integrant.repl.state)
        (reader.dev.seed/seed!
          (:reader.db/datasource integrant.repl.state/system))
        :seeded)")
-
-(defn- bytes->str [x] (if (bytes? x) (String. ^bytes x "UTF-8") x))
-
-(defn- coerce [v]
-  (cond
-    (map? v)    (into {} (for [[k v] v] [(keyword (bytes->str k)) (coerce v)]))
-    (vector? v) (mapv coerce v)
-    :else       (bytes->str v)))
-
-(defn- nrepl-eval
-  "Send `code` to the nREPL on `port`, drain replies until status :done,
-   and return `{:value … :err …}`."
-  [port code]
-  (with-open [sock (Socket. "127.0.0.1" ^int port)
-              out  (io/output-stream sock)
-              in   (PushbackInputStream. (io/input-stream sock))]
-    (bencode/write-bencode out {"op"   "eval"
-                                "code" code
-                                "id"   (str (random-uuid))})
-    (.flush out)
-    (loop [acc {:value nil :err nil}]
-      (let [m (coerce (bencode/read-bencode in))]
-        (cond
-          (some #{"done"} (:status m)) acc
-          (:value m) (recur (assoc acc :value (:value m)))
-          (:err m)   (recur (update acc :err (fnil str "") (:err m)))
-          (:out m)   (do (print (:out m)) (flush) (recur acc))
-          :else      (recur acc))))))
 
 (def ^:private force-flags #{"--yes" "-y" "--force"})
 
@@ -68,6 +37,15 @@
   (flush)
   (read-line))
 
+(defn- seed-eval!
+  "Resolve the live nREPL from `.nrepl-port` and run the seed there.
+   Throws ConnectException when no REPL is advertised — which means the
+   same thing to the caller as a dead one: nothing to seed into."
+  []
+  (if-let [port (repl/read-port)]
+    (repl/eval-expr port seed-expr)
+    (throw (java.net.ConnectException. (str "no " repl/port-file)))))
+
 (defn seed!
   "Confirm, then populate the running dev database over nREPL. Pass
    --yes/-y/--force (`bb db:seed --yes`) to skip the prompt.
@@ -77,7 +55,7 @@
    a socket, or `System/exit`."
   ([] (seed! *command-line-args*
              ask!
-             #(nrepl-eval nrepl-port seed-expr)
+             seed-eval!
              println
              #(System/exit %)))
   ([args ask-fn eval-fn say-fn exit-fn]
@@ -86,13 +64,13 @@
      (if-not (or forced (affirmative? reply))
        (say-fn "Aborted. Nothing was changed.")
        (do
-         (say-fn (str "Seeding via nREPL on " nrepl-port " ..."))
+         (say-fn "Seeding via the running nREPL ...")
          (try
            (let [{:keys [value err]} (eval-fn)]
              (if err
                (do (say-fn (str "Error: " err)) (exit-fn 1))
                (say-fn (str "Result: " value))))
            (catch java.net.ConnectException _
-             (say-fn (str "Could not connect to nREPL on port " nrepl-port "."))
-             (say-fn "Is `bb dev` running in another terminal?")
+             (say-fn "Could not connect to a running nREPL.")
+             (say-fn "Is `bb dev` running, or have you jacked in and run (go)?")
              (exit-fn 1))))))))

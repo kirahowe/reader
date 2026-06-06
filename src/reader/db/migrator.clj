@@ -5,7 +5,7 @@
    \"depend on a migrated database\" by `#ig/ref`-ing this key instead
    of `:reader.db/datasource`. Halt is a no-op — migrations have no
    live state to hold; the datasource is halted by its own key."
-  (:require [com.brunobonacci.mulog :as mu]
+  (:require [clojure.tools.logging :as log]
             [integrant.core :as ig]
             [migratus.core :as migratus]))
 
@@ -15,9 +15,9 @@
    :db            {:datasource datasource}})
 
 (defmethod ig/init-key :reader.db/migrator [_ {:keys [datasource migrations-path]}]
-  (mu/log ::starting :migrations-path migrations-path)
+  (log/info "migrator starting" {:migrations-path migrations-path})
   (migratus/migrate (migratus-config datasource migrations-path))
-  (mu/log ::done)
+  (log/info "migrator done")
   datasource)
 
 (defmethod ig/halt-key! :reader.db/migrator [_ _])

@@ -6,22 +6,22 @@
 
    First-run cost ~1.5s while the postgres binary is unpacked into
    `~/.embedded-postgres-binaries`; subsequent runs are ~500ms warm."
-  (:require [com.brunobonacci.mulog :as mu]
+  (:require [clojure.tools.logging :as log]
             [integrant.core :as ig])
   (:import (io.zonky.test.db.postgres.embedded EmbeddedPostgres)))
 
 (defmethod ig/init-key :reader.dev.infra/postgres [_ _]
-  (mu/log ::starting)
+  (log/info "embedded-postgres starting")
   (let [pg   (.start (EmbeddedPostgres/builder))
         port (.getPort pg)]
-    (mu/log ::started :port port)
-    ;; The handle lives in metadata so consumers (HikariCP, mu/log, any
-    ;; logger that prints the spec) see only the JDBC connection fields.
+    (log/info "embedded-postgres started" {:port port})
+    ;; The handle lives in metadata so consumers (HikariCP, any logger that
+    ;; prints the spec) see only the JDBC connection fields.
     (with-meta {:jdbc-url (str "jdbc:postgresql://localhost:" port "/postgres")
                 :username "postgres"
                 :password "postgres"}
       {::handle pg})))
 
 (defmethod ig/halt-key! :reader.dev.infra/postgres [_ spec]
-  (mu/log ::stopping)
+  (log/info "embedded-postgres stopping")
   (.close ^EmbeddedPostgres (::handle (meta spec))))

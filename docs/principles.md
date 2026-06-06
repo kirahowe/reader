@@ -40,7 +40,7 @@ injected by a secret store, anything that legitimately differs per
 machine.
 
 Everything else -- feature flags, retry counts, queue names, log levels,
-which publisher mu/log uses, the URL of a sibling service -- is just
+which handler Telemere uses, the URL of a sibling service -- is just
 configuration. It belongs in **per-environment EDN profiles** that get
 **meta-merged** on top of a base config at startup.
 
@@ -228,14 +228,16 @@ mess against a denormalized one.
 
 ## 11. Logging is structured.
 
-Use **mu/log**. Log events are maps of keywords to values, not
-formatted strings. `(mu/log ::user-signed-in :user-id uid :method
-:magic-link)`, not `(log/info (str "User " uid " signed in via magic
-link"))`.
+Log through **`clojure.tools.logging`**, backed by **Telemere**. Attach
+data as a map rather than interpolating it into a sentence: `(log/info
+"user signed in" {:user-id uid :method :magic-link})`, not `(log/info
+(str "User " uid " signed in via magic link"))`. Telemere records each
+call as a structured signal -- namespace, level, message, and the
+attached map -- so the data stays queryable wherever logs land.
 
-In dev, pretty-print to the console. In prod, ship structured JSON to
-wherever logs go. The publisher is an Integrant component -- it has a
-lifecycle and gets started and stopped with the rest of the system.
+In dev, pretty-print to the console. In prod, emit structured JSON to
+wherever logs go. The handler is wired by an Integrant component -- it
+has a lifecycle and gets started and stopped with the rest of the system.
 
 Log at the **edges** (request in, request out, job start, job finish,
 external call out, external call back) and at every **decision

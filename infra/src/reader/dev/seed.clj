@@ -5,7 +5,7 @@
    already-populated dev db is safe. Lives in `infra/src/` so it stays
    out of the prod uberjar."
   (:require [clojure.string :as str]
-            [com.brunobonacci.mulog :as mu]
+            [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
             [next.jdbc.transaction]
             [reader.authors :as authors]
@@ -127,7 +127,7 @@
     (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id paper))})))
 
 (defn seed! [ds]
-  (mu/log ::starting)
+  (log/info "seed starting")
   (assert-local-db! ds)
   ;; One outer transaction so a partial failure rolls the whole seed
   ;; back. `:ignore` makes the inner `with-transaction` in
@@ -135,4 +135,4 @@
   (binding [next.jdbc.transaction/*nested-tx* :ignore]
     (jdbc/with-transaction [tx ds]
       (seed-in-tx! tx)))
-  (mu/log ::done))
+  (log/info "seed done"))

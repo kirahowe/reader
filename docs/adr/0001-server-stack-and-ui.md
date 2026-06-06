@@ -23,7 +23,7 @@ introspectable as it grows.
 | CSS                     | Vanilla, design-token-driven        |
 | Background work         | core.async + a durable jobs table   |
 | In-memory caches        | clojure.core.cache                  |
-| Structured logging      | mu/log                              |
+| Structured logging      | clojure.tools.logging + Telemere    |
 | Tests                   | kaocha                              |
 | Build                   | tools.build                         |
 
@@ -62,8 +62,9 @@ newsletter) belongs in a Postgres `jobs` table drained by workers using
 `SELECT ... FOR UPDATE SKIP LOCKED`. In-memory `chan`s are reserved
 for transient coordination inside a single request.
 
-**Structured logs.** mu/log events are maps, not formatted strings.
-Pretty in dev, JSON in prod. The publisher is an Integrant component.
+**Structured logs.** Code logs through `clojure.tools.logging`; Telemere
+is the backend, recording each call as a structured signal. Pretty in
+dev, JSON in prod. The handler is wired by an Integrant component.
 
 ## Consequences
 

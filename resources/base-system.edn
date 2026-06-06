@@ -1,6 +1,5 @@
 {:reader.log/publisher
- {:type    :console
-  :pretty? false}
+ {:pretty? false}
 
  :reader.concerns.reitit/router
  {:data

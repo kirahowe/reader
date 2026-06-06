@@ -184,7 +184,7 @@ Make the worker safe to leave running.
 - A worker process killed mid-job is recovered by the next worker
   without manual intervention.
 - A poison-pill job ends in `failed` rather than spinning forever.
-- The admin view shows real numbers driven by mu/log events.
+- The admin view shows real numbers driven by Telemere signals.
 
 ---
 
@@ -195,7 +195,7 @@ The boring-but-important stuff before this is the daily-driver.
 **Components**
 - `GET /health` upgraded to actually ping the DB and check job-worker
   liveness; Fly health check switched to it.
-- mu/log publisher in prod ships JSON to a destination (Better Stack,
+- Telemere handler in prod ships JSON to a destination (Better Stack,
   Axiom, or just stdout for Fly's log pipeline — decide when we get
   there).
 - Basic dashboards: request rate, error rate, p95 latency, queue depth.

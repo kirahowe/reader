@@ -37,7 +37,7 @@ flowchart TB
       emailwork["Email ingestion"]
     end
 
-    mulog["mu/log publisher"]
+    telemere["Telemere<br/><i>tools.logging backend</i>"]
     cache["core.cache<br/><i>LRU caches</i>"]
 
     httpkit --> mw --> reitit --> domain
@@ -64,12 +64,12 @@ flowchart TB
   workers --> neon
   workers --> r2
 
-  domain -.publishes events.-> mulog
-  workers -.publishes events.-> mulog
+  domain -.logs via tools.logging.-> telemere
+  workers -.logs via tools.logging.-> telemere
 
   ig -.starts/stops.-> httpkit
   ig -.starts/stops.-> workers
-  ig -.starts/stops.-> mulog
+  ig -.starts/stops.-> telemere
   ig -.starts/stops.-> cache
 
   classDef ext fill:#f4f1ec,stroke:#999,color:#333
@@ -101,7 +101,7 @@ at use-time.
 
 | Component                                    | Owns                                                |
 | -------------------------------------------- | --------------------------------------------------- |
-| `:reader.log/publisher`                      | the mu/log publisher                                |
+| `:reader.log/publisher`                      | Telemere as the `clojure.tools.logging` backend     |
 | `:reader.concerns/http-kit`                  | the http-kit server (port, host, lifecycle)         |
 | `:reader.concerns.reitit/ring-handler`       | the assembled Ring handler                          |
 | `:reader.concerns.reitit/router`             | the Reitit router, with routes data from EDN        |
@@ -131,15 +131,15 @@ sequenceDiagram
   participant H as http-kit + Reitit
   participant D as domain handler
   participant DB as Postgres (Neon)
-  participant L as mu/log
+  participant L as Telemere
 
   B->>H: GET /queue (cookie: session JWT)
   H->>H: auth middleware verifies JWT (Hanko-issued)
   H->>D: handler(req {user-id})
-  D->>L: ::queue-fetch-start {user-id}
+  D->>L: log/info "queue fetch start" {:user-id}
   D->>DB: SELECT readables JOIN queue_items WHERE user_id = ?
   DB-->>D: rows
-  D->>L: ::queue-fetch-done {user-id :count n}
+  D->>L: log/info "queue fetch done" {:user-id :count n}
   D-->>H: hiccup -> string -> ring response
   H-->>B: 200 text/html
 ```

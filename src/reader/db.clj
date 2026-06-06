@@ -1,7 +1,7 @@
 (ns reader.db
   "The app's HikariCP connection pool — `:reader.db/datasource`."
   (:require [clojure.string :as str]
-            [com.brunobonacci.mulog :as mu]
+            [clojure.tools.logging :as log]
             [integrant.core :as ig]
             [next.jdbc.connection :as connection]
             [reader.db.types]) ; load jsonb / Instant protocol extensions
@@ -24,11 +24,11 @@
   (some-> jdbc-url (str/replace #"//[^@/]+@" "//")))
 
 (defmethod ig/init-key :reader.db/datasource [_ {:keys [spec]}]
-  (mu/log ::starting :jdbc-url (redact-url (:jdbc-url spec)))
+  (log/info "datasource starting" {:jdbc-url (redact-url (:jdbc-url spec))})
   (let [ds (connection/->pool HikariDataSource (update-keys spec kebab->camel))]
-    (mu/log ::started :pool-name (:pool-name spec))
+    (log/info "datasource started" {:pool-name (:pool-name spec)})
     ds))
 
 (defmethod ig/halt-key! :reader.db/datasource [_ ^HikariDataSource ds]
-  (mu/log ::stopping)
+  (log/info "datasource stopping")
   (.close ds))

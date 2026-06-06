@@ -4,7 +4,7 @@
   `-main` (if given) is treated as the name of an extra profile
   resource that is appended to `core-profiles`."
   (:require [clojure.java.io :as io]
-            [com.brunobonacci.mulog :as mu]
+            [clojure.tools.logging :as log]
             [integrant.core :as ig]
             [meta-merge.core :as mm]
             [reader.concerns.integrant :as igc])
@@ -35,7 +35,7 @@
   [profiles]
   (let [config (doto (merge-profiles profiles)
                  (ig/load-namespaces))]
-    (mu/log ::config-prepped :profiles profiles)
+    (log/info "config prepped" {:profiles profiles})
     config))
 
 (def core-profiles [(io/resource "base-system.edn")])
@@ -49,11 +49,11 @@
   (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable f)))
 
 (defn -main [& args]
-  (mu/log ::starting :args args)
+  (log/info "starting" {:args args})
   (let [profiles (if-let [supplied (first args)]
                    (concat core-profiles [supplied])
                    core-profiles)
         system   (exec-config profiles)]
-    (on-shutdown! #(do (mu/log ::shutdown)
+    (on-shutdown! #(do (log/info "shutdown")
                        (ig/halt! system)))
-    (mu/log ::ready)))
+    (log/info "ready")))

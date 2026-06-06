@@ -7,7 +7,7 @@
    tasks discover and connect to it — no hardcoded port."
   (:require [cider.nrepl :refer [cider-nrepl-handler]]
             [clojure.java.io :as io]
-            [com.brunobonacci.mulog :as mu]
+            [clojure.tools.logging :as log]
             [integrant.repl :as igr]
             [integrant.repl.state :as igs]
             [nrepl.server :as nrepl]
@@ -28,9 +28,9 @@
     (.addShutdownHook (Runtime/getRuntime)
                       (Thread. ^Runnable
                                (fn []
-                                 (mu/log ::shutdown)
+                                 (log/info "dev shutdown")
                                  (nrepl/stop-server server)
                                  (io/delete-file port-file true)
                                  (when igs/system (igr/halt)))))
-    (mu/log ::ready :nrepl-port port)
+    (log/info "dev ready" {:nrepl-port port})
     (println "Reader dev ready. cider-nrepl on" port "(advertised in" (str port-file ")"))))

@@ -3,6 +3,7 @@
    create!/list-sorted integration behaviour it feeds."
   (:require [clojure.test :refer [deftest is testing]]
             [reader.authors :as authors]
+            [reader.db.crud :as crud]
             [reader.test-support.setup :refer [with-system]]))
 
 (deftest derive-sort-name-test
@@ -76,3 +77,41 @@
         ;; Aristotle < Didion, Joan < McPhee, John < Smith, Zadie
         (is (= ["Aristotle" "Joan Didion" "John McPhee" "Zadie Smith"]
                (map :authors/name (authors/list-sorted ds))))))))
+
+(deftest by-slug-test
+  (with-system [system]
+    (let [ds (:reader.db/datasource system)]
+      (authors/create! ds {:name "Joan Didion" :slug "joan-didion"})
+
+      (testing "returns the author matching the slug"
+        (is (= "Joan Didion" (:authors/name (authors/by-slug ds "joan-didion")))))
+
+      (testing "returns nil for an unknown slug"
+        (is (nil? (authors/by-slug ds "nobody")))))))
+
+(deftest affiliations-of-test
+  (with-system [system]
+    (let [ds      (:reader.db/datasource system)
+          didion  (authors/create! ds {:name "Joan Didion" :slug "jd"})
+          smith   (authors/create! ds {:name "Zadie Smith" :slug "zs"})
+          ny      (crud/create! ds :affiliations {:name "The New Yorker" :slug "tny" :type "magazine"})
+          harpers (crud/create! ds :affiliations {:name "Harper's" :slug "harpers" :type "magazine"})]
+      (crud/create! ds :author-affiliations {:author-id      (:authors/id didion)
+                                             :affiliation-id (:affiliations/id ny)
+                                             :role           "staff writer"
+                                             :is-primary     true})
+      (crud/create! ds :author-affiliations {:author-id      (:authors/id didion)
+                                             :affiliation-id (:affiliations/id harpers)
+                                             :role           "contributor"
+                                             :is-primary     false})
+
+      (testing "returns the author's affiliations, primary first"
+        (let [affs (authors/affiliations-of ds (:authors/id didion))]
+          (is (= ["The New Yorker" "Harper's"] (map :name affs))
+              "the primary affiliation sorts ahead of the rest")
+          (is (= {:name "The New Yorker" :slug "tny" :type "magazine"
+                  :role "staff writer" :primary? true}
+                 (first affs)))))
+
+      (testing "an author with no affiliations yields an empty seq"
+        (is (= [] (authors/affiliations-of ds (:authors/id smith))))))))

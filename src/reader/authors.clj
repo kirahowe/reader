@@ -64,3 +64,27 @@
                               :from     [:authors]
                               :order-by [[[:coalesce :sort-name :name] :asc]]})
                  crud/opts))
+
+(defn by-slug
+  "The author with this URL slug, or nil."
+  [ds slug]
+  (crud/find-1 ds :authors {:slug slug}))
+
+(defn affiliations-of
+  "The outlets `author-id` writes for, joined to the affiliation rows and
+   flattened to {:name :slug :type :role :primary?}, primary first then by
+   name. Two small reads joined in Clojure — keeps the result-set builder
+   off a multi-table join."
+  [ds author-id]
+  (let [affs (into {} (map (juxt :affiliations/id identity))
+                   (crud/find-many ds :affiliations))]
+    (->> (crud/find-many ds :author-affiliations {:author-id author-id})
+         (map (fn [link]
+                (let [a (get affs (:author-affiliations/affiliation-id link))]
+                  {:name     (:affiliations/name a)
+                   :slug     (:affiliations/slug a)
+                   :type     (:affiliations/type a)
+                   :role     (:author-affiliations/role link)
+                   :primary? (:author-affiliations/is-primary link)})))
+         (sort-by (juxt (complement :primary?) :name))
+         vec)))

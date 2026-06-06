@@ -30,6 +30,7 @@
 
   :test   {:extra-paths ["test" "env/test/resources" "infra/src" "infra/resources"]
            :extra-deps  {lambdaisland/kaocha                                              {:mvn/version "1.91.1392"}
+                         ring/ring-mock                                                   {:mvn/version "0.6.2"}
                          io.zonky.test/embedded-postgres                                  {:mvn/version "2.1.0"}
                          io.zonky.test.postgres/embedded-postgres-binaries-darwin-arm64v8 {:mvn/version "17.5.0"}
                          io.zonky.test.postgres/embedded-postgres-binaries-linux-amd64    {:mvn/version "17.5.0"}}

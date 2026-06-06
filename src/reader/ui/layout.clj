@@ -17,3 +17,12 @@
           [:link {:rel "stylesheet" :href "/static/css/tokens.css"}]
           [:link {:rel "stylesheet" :href "/static/css/main.css"}]]
          [:body body]])))
+
+(defn not-found
+  "The body for a 404, wrapped in the standard layout."
+  [message]
+  (page "Not found"
+        [:main
+         [:h1 "Not found"]
+         [:p.muted message]
+         [:p [:a {:href "/"} "Back to your reading list"]]]))

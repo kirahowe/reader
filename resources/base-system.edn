@@ -3,9 +3,15 @@
 
  :reader.concerns.reitit/router
  {:data
-  [["/"         {:get {:handler #ig/ref :reader.handlers/home}}]
-   ["/health"   {:get {:handler #ig/ref :reader.handlers/health}}]
-   ["/static/*" #ig/ref :reader.handlers/static]]}
+  [["/"                    {:get  {:handler #ig/ref :reader.handlers/home}}]
+   ["/authors"             {:get  {:handler #ig/ref :reader.handlers.authors/index}}]
+   ["/authors/:slug"       {:get  {:handler #ig/ref :reader.handlers.authors/show}}]
+   ["/affiliations"        {:get  {:handler #ig/ref :reader.handlers.affiliations/index}}]
+   ["/articles/new"        {:get  {:handler #ig/ref :reader.handlers.articles/new}}]
+   ["/articles"            {:post {:handler #ig/ref :reader.handlers.articles/create}}]
+   ["/readables/:table/:id/delete" {:post {:handler #ig/ref :reader.handlers.readables/delete}}]
+   ["/health"              {:get  {:handler #ig/ref :reader.handlers/health}}]
+   ["/static/*"            #ig/ref :reader.handlers/static]]}
 
  :reader.concerns.reitit/default-handler {}
 
@@ -13,7 +19,13 @@
  {:router          #ig/ref :reader.concerns.reitit/router
   :default-handler #ig/ref :reader.concerns.reitit/default-handler}
 
- :reader.handlers/home   {}
+ :reader.handlers/home               {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.authors/index      {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.authors/show       {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.affiliations/index {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.articles/new       {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.articles/create    {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.readables/delete   {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 

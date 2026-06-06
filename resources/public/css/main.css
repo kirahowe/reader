@@ -9,6 +9,7 @@ body {
   color: var(--fg);
   line-height: 1.5;
   font-size: 16px;
+  -webkit-font-smoothing: antialiased;
 }
 
 main {
@@ -21,6 +22,7 @@ h1, h2, h3 {
   font-family: var(--font-prose);
   font-weight: 500;
   letter-spacing: -0.01em;
+  line-height: 1.2;
   margin: 0 0 var(--space-3);
 }
 
@@ -29,24 +31,109 @@ h2 { font-size: 1.25rem; }
 
 p { margin: 0 0 var(--space-3); }
 
+/* Links look like links — underlined in their own colour, warming to the
+   accent on hover, rather than a loud blue. */
 a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 0.15em;
   text-decoration-thickness: 1px;
+  transition: color 0.15s;
 }
 a:hover { color: var(--accent); }
 
 hr { border: 0; border-top: 1px solid var(--rule); margin: var(--space-4) 0; }
 
+/* A single, consistent keyboard-focus ring everywhere. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Buttons. The bare element is a quiet secondary control; `.primary`-style
+   form submits fill with the accent. Inline list actions are restyled to
+   read as text (see .readable-actions) while staying real, focusable buttons. */
 button {
   font: inherit;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--rule);
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 button:hover { border-color: var(--fg); }
 
 .muted { color: var(--muted); }
+
+/* Index navigation: the subtle cross-links between list pages. */
+.index-nav { font-size: 0.875rem; margin-bottom: var(--space-5); }
+
+/* Reading list */
+.readables, .entities { list-style: none; padding: 0; margin: 0; }
+
+.readable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+}
+.readable:first-child { border-top: 0; padding-top: 0; }
+
+.readable-text { flex: 1; min-width: 0; }
+
+.readable-title {
+  font-family: var(--font-prose);
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.readable-meta { font-size: 0.875rem; margin-top: var(--space-1); }
+
+/* The row action is a real, focusable <button> dressed down to a quiet icon. */
+.readable-actions { flex-shrink: 0; }
+.readable-actions button {
+  display: inline-flex;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+}
+.readable-actions button:hover { background: transparent; color: var(--accent); }
+.readable-actions svg { display: block; width: 1.125rem; height: 1.125rem; }
+
+/* Entity indexes (authors, sources) */
+.entities li { padding: var(--space-3) 0; border-top: 1px solid var(--rule); }
+.entities li:first-child { border-top: 0; padding-top: 0; }
+
+/* Forms */
+.form { max-width: 32rem; }
+.form label { display: block; margin-bottom: var(--space-4); }
+.form .label-text {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.form input, .form textarea, .form select {
+  font: inherit;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg);
+  color: inherit;
+}
+.form input:focus, .form textarea:focus, .form select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.form textarea { min-height: 6rem; resize: vertical; }
+.form .error { color: var(--accent); font-size: 0.875rem; margin-top: var(--space-1); }
+
+.form button[type="submit"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+.form button[type="submit"]:hover { filter: brightness(1.08); border-color: var(--accent); }

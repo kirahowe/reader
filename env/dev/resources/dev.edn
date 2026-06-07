@@ -10,7 +10,10 @@
  ;; base — swap both to use your own project. `issuer` is intentionally left
  ;; unset — the project-specific JWKS already binds tokens to this project;
  ;; pin it later if you want defense in depth.
+ ;; allowed-emails is the dev invite list. It's a single throwaway identity,
+ ;; `test@example.com`, which `bb db:seed` also provisions as a user with a
+ ;; populated queue — make a Hanko user for it and sign in to land on real data.
  :reader.auth/middleware {:jwks-url       "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io/.well-known/jwks.json"
-                          :allowed-emails #{"email@kirahowe.com"}}
+                          :allowed-emails #{"test@example.com"}}
 
  :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}}

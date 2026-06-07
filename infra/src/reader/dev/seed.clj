@@ -1,9 +1,11 @@
 (ns reader.dev.seed
   "Drops a coherent set of realistic fixtures into the dev database so
-   `bb db:seed` produces something worth pointing a UI at. Idempotent —
-   truncates the seeded tables first, so re-running against an
-   already-populated dev db is safe. Lives in `infra/src/` so it stays
-   out of the prod uberjar."
+   `bb db:seed` produces something worth pointing a UI at. Two users with
+   overlapping queues, so the per-user reading queue (reader.reading) has
+   something real to show: some queue items point at the same underlying
+   readable, held at different states by each user. Idempotent — truncates the
+   seeded tables first, so re-running against an already-populated dev db is
+   safe. Lives in `infra/src/` so it stays out of the prod uberjar."
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
@@ -37,16 +39,29 @@
   (assert-local-url! (with-open [conn (jdbc/get-connection ds)]
                        (.. conn getMetaData getURL))))
 
+(defn- queue!
+  "Add one queue item for `user`. `readable-type` is the stored string
+   (\"article\" / \"paper\" / \"newsletter_issue\"); `via` records provenance."
+  [tx user readable-type readable-id state via]
+  (crud/create! tx :queue-items {:user-id       (:users/id user)
+                                 :readable-type readable-type
+                                 :readable-id   readable-id
+                                 :state         state
+                                 :via           via}))
+
 (defn- seed-in-tx! [tx]
   (jdbc/execute! tx [(str "TRUNCATE " (str/join ", " seeded-tables) " CASCADE")])
-  ;; sort-name omitted: these "First Last" bylines derive cleanly via the
-  ;; heuristic in reader.authors/create!.
-  (let [didion  (authors/create! tx {:name "Joan Didion"
+  (let [;; Authors. sort-name omitted: these "First Last" bylines derive cleanly
+        ;; via the heuristic in reader.authors/create!.
+        didion  (authors/create! tx {:name "Joan Didion"
                                      :slug "joan-didion"
                                      :bio  "American essayist and novelist."})
         smith   (authors/create! tx {:name "Zadie Smith" :slug "zadie-smith"})
         mcphee  (authors/create! tx {:name "John McPhee" :slug "john-mcphee"})
+        vaswani (authors/create! tx {:name "Ashish Vaswani" :slug "ashish-vaswani"})
+        he      (authors/create! tx {:name "Kaiming He" :slug "kaiming-he"})
 
+        ;; Affiliations: each readable's own source.
         ny      (crud/create! tx :affiliations {:name "The New Yorker"
                                                 :slug "the-new-yorker"
                                                 :type "magazine"
@@ -59,30 +74,60 @@
                                                 :type "preprint"
                                                 :url  "https://arxiv.org"})
 
-        article (crud/create! tx :articles
-                              {:affiliation-id    (:affiliations/id ny)
-                               :title             "The White Album"
-                               :slug              "the-white-album"
-                               :canonical-url     "https://www.newyorker.com/the-white-album"
-                               :word-count        5200
-                               :reading-time-secs 1560
-                               :abstract          "On living in California in the late sixties."})
-        paper   (crud/create! tx :papers
-                              {:affiliation-id (:affiliations/id arxiv)
-                               :title          "Attention Is All You Need"
-                               :doi            "10.48550/arXiv.1706.03762"
-                               :arxiv-id       "1706.03762"
-                               :abstract       "The Transformer architecture."
-                               :pdf-object-key "papers/1706.03762.pdf"})
-        issue   (crud/create! tx :newsletter-issues
-                              {:affiliation-id       (:affiliations/id act-nl)
-                               :subject              "ACT links for the week"
-                               :body-html            "<h1>This week</h1><p>…</p>"
-                               :raw-email-object-key "issues/act-2026-W21.eml"})
+        ;; Readables: three articles, two papers, one newsletter issue.
+        white     (crud/create! tx :articles
+                                {:affiliation-id    (:affiliations/id ny)
+                                 :title             "The White Album"
+                                 :slug              "the-white-album"
+                                 :canonical-url     "https://www.newyorker.com/the-white-album"
+                                 :word-count        5200
+                                 :reading-time-secs 1560
+                                 :abstract          "On living in California in the late sixties."})
+        slouching (crud/create! tx :articles
+                                {:affiliation-id    (:affiliations/id ny)
+                                 :title             "Slouching Towards Bethlehem"
+                                 :slug              "slouching-towards-bethlehem"
+                                 :canonical-url     "https://www.newyorker.com/slouching-towards-bethlehem"
+                                 :word-count        7100
+                                 :reading-time-secs 2130
+                                 :abstract          "A portrait of the Haight-Ashbury in 1967."})
+        marvin    (crud/create! tx :articles
+                                {:affiliation-id    (:affiliations/id ny)
+                                 :title             "The Search for Marvin Gardens"
+                                 :slug              "the-search-for-marvin-gardens"
+                                 :canonical-url     "https://www.newyorker.com/the-search-for-marvin-gardens"
+                                 :word-count        6400
+                                 :reading-time-secs 1920
+                                 :abstract          "Monopoly, Atlantic City, and the board behind the game."})
 
-        user    (crud/create! tx :users {:email        "kira@reader.test"
-                                         :display-name "Kira"})]
+        attention (crud/create! tx :papers
+                                {:affiliation-id (:affiliations/id arxiv)
+                                 :title          "Attention Is All You Need"
+                                 :doi            "10.48550/arXiv.1706.03762"
+                                 :arxiv-id       "1706.03762"
+                                 :abstract       "The Transformer architecture."
+                                 :pdf-object-key "papers/1706.03762.pdf"})
+        resnet    (crud/create! tx :papers
+                                {:affiliation-id (:affiliations/id arxiv)
+                                 :title          "Deep Residual Learning for Image Recognition"
+                                 :doi            "10.48550/arXiv.1512.03385"
+                                 :arxiv-id       "1512.03385"
+                                 :abstract       "Residual connections for very deep networks."
+                                 :pdf-object-key "papers/1512.03385.pdf"})
 
+        issue     (crud/create! tx :newsletter-issues
+                                {:affiliation-id       (:affiliations/id act-nl)
+                                 :subject              "ACT links for the week"
+                                 :body-html            "<h1>This week</h1><p>…</p>"
+                                 :raw-email-object-key "issues/act-2026-W21.eml"})
+
+        ;; Users. test@example.com is the dev login (the lone address allowlisted
+        ;; in env/dev/resources/dev.edn). Multi-user on purpose: the two queues
+        ;; overlap (below).
+        test-user (crud/create! tx :users {:email "test@example.com"  :display-name "Test User"})
+        marcus    (crud/create! tx :users {:email "marcus@reader.test" :display-name "Marcus Chen"})]
+
+    ;; Author <-> affiliation stints.
     (crud/create! tx :author-affiliations {:author-id      (:authors/id didion)
                                            :affiliation-id (:affiliations/id ny)
                                            :role           "staff writer"
@@ -95,9 +140,26 @@
     (crud/create! tx :newsletter-sources {:affiliation-id      (:affiliations/id act-nl)
                                           :inbound-email-alias "act@inbox.reader.test"})
 
+    ;; Bylines (the polymorphic readable <-> author bridge).
     (authorships/attach! tx {:author-id     (:authors/id didion)
                              :readable-type :article
-                             :readable-id   (:articles/id article)
+                             :readable-id   (:articles/id white)
+                             :ordinal       0})
+    (authorships/attach! tx {:author-id     (:authors/id didion)
+                             :readable-type :article
+                             :readable-id   (:articles/id slouching)
+                             :ordinal       0})
+    (authorships/attach! tx {:author-id     (:authors/id mcphee)
+                             :readable-type :article
+                             :readable-id   (:articles/id marvin)
+                             :ordinal       0})
+    (authorships/attach! tx {:author-id     (:authors/id vaswani)
+                             :readable-type :paper
+                             :readable-id   (:papers/id attention)
+                             :ordinal       0})
+    (authorships/attach! tx {:author-id     (:authors/id he)
+                             :readable-type :paper
+                             :readable-id   (:papers/id resnet)
                              :ordinal       0})
     (authorships/attach! tx {:author-id         (:authors/id smith)
                              :readable-type     :newsletter-issue
@@ -105,26 +167,27 @@
                              :ordinal           0
                              :contribution-type "guest"})
 
-    (crud/create! tx :email-inboxes {:user-id (:users/id user)
-                                     :alias   "kira+1@inbox.reader.test"})
+    ;; Inboxes.
+    (crud/create! tx :email-inboxes {:user-id (:users/id test-user) :alias "test+1@inbox.reader.test"})
+    (crud/create! tx :email-inboxes {:user-id (:users/id marcus)    :alias "marcus+1@inbox.reader.test"})
 
-    (crud/create! tx :queue-items {:user-id       (:users/id user)
-                                   :readable-type "article"
-                                   :readable-id   (:articles/id article)
-                                   :via           {:source "manual"}})
-    (crud/create! tx :queue-items {:user-id       (:users/id user)
-                                   :readable-type "paper"
-                                   :readable-id   (:papers/id paper)
-                                   :state         "reading"
-                                   :via           {:source "import" :note "arXiv discovery"}})
-    (crud/create! tx :queue-items {:user-id       (:users/id user)
-                                   :readable-type "newsletter_issue"
-                                   :readable-id   (:newsletter-issues/id issue)
-                                   :state         "read"
-                                   :via           {:source "email"}})
+    ;; Queues. Both users have several items, and they SHARE two readables — the
+    ;; White Album and the Attention paper — held at different states by each.
+    ;; That's the whole point of queue_items being per-user over shared readables.
+    (queue! tx test-user "article"          (:articles/id white)          "unread"  {:source "manual"})
+    (queue! tx test-user "article"          (:articles/id marvin)         "unread"  {:source "manual"})
+    (queue! tx test-user "paper"            (:papers/id attention)        "reading" {:source "import" :note "arXiv discovery"})
+    (queue! tx test-user "newsletter_issue" (:newsletter-issues/id issue) "read"    {:source "email"})
 
-    (jobs/enqueue! tx "thumbnails"    {:article-id (str (:articles/id article))})
-    (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id paper))})))
+    (queue! tx marcus "article"        (:articles/id white)     "reading" {:source "manual"})
+    (queue! tx marcus "article"        (:articles/id slouching) "unread"  {:source "manual"})
+    (queue! tx marcus "paper"          (:papers/id attention)   "unread"  {:source "import"})
+    (queue! tx marcus "paper"          (:papers/id resnet)      "read"    {:source "import"})
+
+    ;; A few durable jobs in flight.
+    (jobs/enqueue! tx "thumbnails"    {:article-id (str (:articles/id white))})
+    (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id attention))})
+    (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id resnet))})))
 
 (defn seed! [ds]
   (log/info "seed starting")

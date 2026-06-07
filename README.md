@@ -51,6 +51,36 @@ bb db:seed
 See [Database](#database) for what that loads, how migrations apply,
 and how to set up Neon for prod.
 
+### Signing in
+
+Every route except `/login`, `/health`, and `/static/*` requires a
+signed-in user. Auth is [Hanko](https://hanko.io) — passwordless
+(passkeys, plus an emailed passcode), so there is nothing
+password-shaped to seed.
+
+The dev profile points at a shared Hanko Cloud project and invite-gates
+provisioning to a single throwaway address, `test@example.com`
+(`:allowed-emails` in
+[`env/dev/resources/dev.edn`](env/dev/resources/dev.edn)). `bb db:seed`
+also provisions `test@example.com` as one of its two seeded users, with
+a pre-populated queue — so once you sign in you land on real data, not
+an empty list. To sign in:
+
+1. In the [Hanko dashboard](https://cloud.hanko.io) for the dev
+   project, create a user for `test@example.com`. You can't use the
+   `/login` sign-up flow for it: that sends a confirmation code to the
+   address, and `example.com` can't receive mail — so add the user
+   directly in the dashboard instead.
+2. Visit <http://localhost:3000/login> and authenticate as
+   `test@example.com`.
+
+You inherit that user's seeded queue (articles, a paper, a newsletter
+issue — two of them also in a second seeded user's queue at different
+read states, exercising the shared-readable model). Order doesn't
+matter: sign in whenever, and a refresh after `bb db:seed` picks up the
+seeded queue. Invite more testers by adding their addresses to
+`:allowed-emails`.
+
 Other useful tasks (run `bb tasks` for the full list):
 
 | Task           | What it does                                          |
@@ -129,7 +159,8 @@ bb db:seed
 
 This truncates the seeded tables and reinserts a coherent set —
 authors, affiliations, articles, papers, a newsletter issue,
-authorships, and a user with a queue and a couple of jobs. It is
+authorships, two users whose reading queues overlap on shared
+readables, and a couple of jobs. It is
 idempotent and runs over nREPL into the system already running: it
 finds the server through `.nrepl-port` and evals against
 `integrant.repl.state/system`, so the seed lands in the database the

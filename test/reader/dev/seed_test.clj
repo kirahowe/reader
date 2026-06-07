@@ -34,11 +34,21 @@
 
       (testing "fixtures land with the expected shape (spot-check)"
         (is (some? (crud/find-1 ds :authors {:slug "joan-didion"})))
-        (is (= 2 (count (crud/find-many ds :authorships))))
+        (is (= 6 (count (crud/find-many ds :authorships))))
         (is (= "Attention Is All You Need"
                (-> (crud/find-1 ds :papers {:arxiv-id "1706.03762"})
                    :papers/title))
             "jsonb payloads and uuid FKs round-trip cleanly"))
+
+      (testing "the seed is multi-user with an overlapping queue"
+        (is (<= 2 (count (crud/find-many ds :users))) "at least two users")
+        (let [shared (jdbc/execute! ds
+                                    ["SELECT readable_type, readable_id
+                                      FROM queue_items
+                                      GROUP BY readable_type, readable_id
+                                      HAVING count(DISTINCT user_id) > 1"])]
+          (is (seq shared)
+              "at least one readable sits in more than one user's queue")))
 
       (testing "every newsletter_source points at a 'newsletter'-type affiliation"
         ;; The schema notes this invariant is application-enforced (no DB

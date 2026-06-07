@@ -138,10 +138,12 @@ button:hover { border-color: var(--fg); }
   background: var(--bg);
   color: inherit;
 }
-.form input:focus, .form textarea:focus, .form select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+/* Focus shows the accent border on any focus, but the outline is only dropped
+   for non-keyboard focus — keyboard users keep the global :focus-visible ring. */
+.form input:focus, .form textarea:focus, .form select:focus { border-color: var(--accent); }
+.form input:focus:not(:focus-visible),
+.form textarea:focus:not(:focus-visible),
+.form select:focus:not(:focus-visible) { outline: none; }
 .form textarea { min-height: 6rem; resize: vertical; }
 .form .error { color: var(--accent); font-size: 0.875rem; margin-top: var(--space-1); }
 

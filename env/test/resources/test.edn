@@ -1,2 +1,16 @@
 {:reader.concerns/http-kit
- {:opts {:port 0}}}
+ {:opts {:port 0}}
+
+ ;; A concrete origin so the CSRF gate is actually live in the test system
+ ;; (it's inert when site-origin is nil). ring-mock sends no Origin/Referer,
+ ;; so existing requests fall through the no-header branch; the csrf tests set
+ ;; the headers explicitly.
+ :reader.web/csrf {:site-origin "http://localhost"}
+
+ ;; Verify against the committed local JWKS; tests mint matching tokens with
+ ;; clj-jwt/sign. The invite allowlist is a single fixture address.
+ :reader.auth/middleware
+ {:jwks-url       #resource "test-jwks.json"
+  :allowed-emails #{"allowed@x.test"}}
+
+ :reader.handlers.auth/login {:api-url "https://test.invalid"}}

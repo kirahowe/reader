@@ -1,5 +1,16 @@
-{:reader.log/publisher
- {:pretty? true}
+{:reader.log/publisher {:pretty? true}
 
- :reader.concerns/http-kit
- {:opts {:port 3000}}}
+ :reader.concerns/http-kit {:opts {:port 3000}}
+
+ :reader.web/csrf {:site-origin "http://localhost:3000"}
+
+ ;; Points at the shared dev Hanko Cloud project (Hanko dashboard → your
+ ;; project); a JWKS URL isn't secret, so it lives in config. `jwks-url` is
+ ;; the project base + /.well-known/jwks.json and `api-url` (below) the bare
+ ;; base — swap both to use your own project. `issuer` is intentionally left
+ ;; unset — the project-specific JWKS already binds tokens to this project;
+ ;; pin it later if you want defense in depth.
+ :reader.auth/middleware {:jwks-url       "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io/.well-known/jwks.json"
+                          :allowed-emails #{"email@kirahowe.com"}}
+
+ :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}}

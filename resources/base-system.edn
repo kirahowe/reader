@@ -2,16 +2,20 @@
  {:pretty? false}
 
  :reader.concerns.reitit/router
- {:data
+ {:middleware [#ig/ref :reader.web/csrf
+               #ig/ref :reader.auth/middleware]
+  :data
   [["/"                    {:get  {:handler #ig/ref :reader.handlers/home}}]
+   ["/login"               {:public? true :get  {:handler #ig/ref :reader.handlers.auth/login}}]
+   ["/logout"              {:public? true :post {:handler #ig/ref :reader.handlers.auth/logout}}]
    ["/authors"             {:get  {:handler #ig/ref :reader.handlers.authors/index}}]
    ["/authors/:slug"       {:get  {:handler #ig/ref :reader.handlers.authors/show}}]
    ["/affiliations"        {:get  {:handler #ig/ref :reader.handlers.affiliations/index}}]
    ["/articles/new"        {:get  {:handler #ig/ref :reader.handlers.articles/new}}]
    ["/articles"            {:post {:handler #ig/ref :reader.handlers.articles/create}}]
    ["/readables/:table/:id/delete" {:post {:handler #ig/ref :reader.handlers.readables/delete}}]
-   ["/health"              {:get  {:handler #ig/ref :reader.handlers/health}}]
-   ["/static/*"            #ig/ref :reader.handlers/static]]}
+   ["/health"              {:public? true :get {:handler #ig/ref :reader.handlers/health}}]
+   ["/static/*"            {:public? true :handler #ig/ref :reader.handlers/static}]]}
 
  :reader.concerns.reitit/default-handler {}
 
@@ -28,6 +32,18 @@
  :reader.handlers.readables/delete   {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
+
+ ;; Auth. jwks-url, issuer, api-url, allowed-emails, and the CSRF site-origin
+ ;; are environment-specific and supplied by the dev/test/prod profiles.
+ ;; allowed-emails gates *provisioning* only: an unseen identity is admitted
+ ;; just when its address is listed (an unset/empty list provisions no one).
+ ;; It is not an ongoing check — a user already in the `users` table is let in
+ ;; regardless of the current list, so revoking access means deleting the row,
+ ;; not editing this set.
+ :reader.web/csrf {}
+ :reader.auth/middleware      {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.auth/login  {}
+ :reader.handlers.auth/logout {}
 
  :reader.concerns/http-kit
  {:handler #ig/ref :reader.concerns.reitit/ring-handler

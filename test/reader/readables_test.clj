@@ -1,8 +1,8 @@
 (ns reader.readables-test
-  "Unit tests for the pure reading-list assembly. No database — `assemble`
+  "Unit tests for the pure readable-catalog assembly. No database — `assemble`
    takes the already-fetched rows (kebab-qualified, exactly as
-   `reader.db.crud` returns them) and produces the normalized list the home
-   page renders."
+   `reader.db.crud` returns them) and produces the normalized catalog the
+   per-user queue is drawn from."
   (:require [clojure.test :refer [deftest is testing]]
             [reader.readables :as readables]))
 
@@ -57,7 +57,7 @@
       (is (= 3 (count items)))
       (is (= #{:article :paper :newsletter-issue} (set (map :type items)))))
 
-    (testing "each item carries the table that backs it, for the delete action"
+    (testing "each item carries the table that backs it"
       (is (= :articles (:table article)))
       (is (= :papers (:table paper)))
       (is (= :newsletter-issues (:table issue))))

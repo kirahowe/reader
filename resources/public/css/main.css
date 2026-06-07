@@ -101,6 +101,7 @@ button:hover { border-color: var(--fg); }
 }
 
 .readable-meta { font-size: 0.875rem; margin-top: var(--space-1); }
+.queue-state { text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.75rem; }
 
 /* The row action is a real, focusable <button> dressed down to a quiet icon. */
 .readable-actions { flex-shrink: 0; }

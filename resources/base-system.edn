@@ -13,7 +13,7 @@
    ["/affiliations"        {:get  {:handler #ig/ref :reader.handlers.affiliations/index}}]
    ["/articles/new"        {:get  {:handler #ig/ref :reader.handlers.articles/new}}]
    ["/articles"            {:post {:handler #ig/ref :reader.handlers.articles/create}}]
-   ["/readables/:table/:id/delete" {:post {:handler #ig/ref :reader.handlers.readables/delete}}]
+   ["/queue/:id/archive"   {:post {:handler #ig/ref :reader.handlers.queue/archive}}]
    ["/health"              {:public? true :get {:handler #ig/ref :reader.handlers/health}}]
    ["/static/*"            {:public? true :handler #ig/ref :reader.handlers/static}]]}
 
@@ -29,7 +29,7 @@
  :reader.handlers.affiliations/index {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.articles/new       {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.articles/create    {:datasource #ig/ref :reader.db/migrator}
- :reader.handlers.readables/delete   {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.queue/archive      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 

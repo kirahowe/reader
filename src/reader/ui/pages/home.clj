@@ -8,14 +8,15 @@
   [:a {:href (str "/authors/" slug)} name])
 
 (defn- meta-line
-  "The subtle line under a title: source, then byline, joined by a dot. Each
-   part appears only when present, so a source-less or author-less readable
-   still reads cleanly."
-  [{:keys [source authors]}]
-  (let [source-frag (when source [:span (:name source)])
+  "The subtle line under a title: queue state (when past unread), source, then
+   byline, joined by a dot. Each part appears only when present, so a state-less
+   or source-less readable still reads cleanly."
+  [{:keys [state source authors]}]
+  (let [state-frag  (when (and state (not= "unread" state)) [:span.queue-state state])
+        source-frag (when source [:span (:name source)])
         byline-frag (when (seq authors)
                       (into [:span] (interpose ", " (map author-link authors))))
-        parts       (remove nil? [source-frag byline-frag])]
+        parts       (remove nil? [state-frag source-frag byline-frag])]
     (when (seq parts)
       (into [:div.readable-meta.muted] (interpose " · " parts)))))
 
@@ -25,14 +26,14 @@
            :stroke "currentColor" :stroke-width "2"
            :stroke-linecap "round" :stroke-linejoin "round"}]])
 
-(defn- item [{:keys [table id title] :as readable}]
+(defn- item [{:keys [queue-item-id title] :as readable}]
   [:li.readable
    [:div.readable-text
     [:div.readable-title title]
     (meta-line readable)]
    [:form.readable-actions {:method "post"
-                            :action (str "/readables/" (name table) "/" id "/delete")}
-    [:button {:type "submit" :aria-label "Remove from reading list"} trash-icon]]])
+                            :action (str "/queue/" queue-item-id "/archive")}
+    [:button {:type "submit" :aria-label "Archive"} trash-icon]]])
 
 (defn render [readables]
   (layout/page

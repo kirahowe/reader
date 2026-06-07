@@ -43,6 +43,16 @@
                                 (seq where) (assoc :where (where-clause where))))
                   opts)))
 
+(defn find-in
+  "Rows of `table` whose `col` is one of `vals`. Empty `vals` short-circuits
+   to `[]` — there is nothing to match, and `IN ()` is invalid SQL anyway."
+  [ds table col vals]
+  (if (seq vals)
+    (jdbc/execute! ds
+                   (sql/format {:select [:*] :from [table] :where [:in col vals]})
+                   opts)
+    []))
+
 (defn find-1
   "Like `find-many` but expects the `where` to identify at most one row.
    Returns nil for no match, the row for exactly one, and throws
@@ -65,6 +75,21 @@
                      (sql/format {:insert-into [table]
                                   :values      [(encode-values attrs)]
                                   :returning   [:*]})
+                     opts))
+
+(defn upsert!
+  "Insert `attrs`; if it collides on the unique `conflict-cols`, update the
+   existing row with `update-set` instead of erroring. Returns the inserted
+   or updated row. `update-set` values are HoneySQL expressions passed through
+   verbatim (e.g. `[:now]`), so any jsonb belongs in `attrs` (the insert side)
+   where `encode-values` will codec it — not in `update-set`."
+  [ds table attrs conflict-cols update-set]
+  (jdbc/execute-one! ds
+                     (sql/format {:insert-into   [table]
+                                  :values        [(encode-values attrs)]
+                                  :on-conflict   conflict-cols
+                                  :do-update-set update-set
+                                  :returning     [:*]})
                      opts))
 
 (defn update! [ds table id attrs]

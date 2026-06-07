@@ -1,7 +1,9 @@
 (ns reader.handlers.articles
   (:require [integrant.core :as ig]
+            [next.jdbc :as jdbc]
             [reader.affiliations :as affiliations]
             [reader.articles :as articles]
+            [reader.reading :as reading]
             [reader.ui.pages.articles :as pages]
             [reader.web.response :as response]))
 
@@ -11,7 +13,15 @@
 
 (defmethod ig/init-key :reader.handlers.articles/create [_ {:keys [datasource]}]
   (fn [req]
-    (let [{:keys [article errors]} (articles/create! datasource (:params req))]
+    ;; Create and enqueue share one transaction: a failed enqueue rolls the
+    ;; article insert back, so we never persist an article that isn't queued.
+    (let [{:keys [article errors]}
+          (jdbc/with-transaction [tx datasource]
+            (let [{:keys [article] :as result} (articles/create! tx (:params req))]
+              (when article
+                (reading/enqueue! tx (:user-id req) "article"
+                                  (:articles/id article) {:source "manual"}))
+              result))]
       (if article
         (response/see-other "/")
         (response/html (pages/new-form (affiliations/list-sorted datasource)

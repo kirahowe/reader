@@ -9,16 +9,29 @@
   (:require [clojure.test :refer [deftest is testing]]
             [reader.db.crud :as crud]
             [reader.dev.seed :as seed]
+            [reader.reading :as reading]
             [reader.test-support.auth :as test-auth]
             [reader.test-support.setup :refer [with-system]]
             [ring.mock.request :as mock]))
 
 (deftest routes-via-handler
   (with-system [system]
-    (seed/seed! (:reader.db/datasource system))
-    (let [handler (:reader.concerns.reitit/ring-handler system)]
+    (let [ds      (:reader.db/datasource system)
+          handler (:reader.concerns.reitit/ring-handler system)]
+      (seed/seed! ds)
+      ;; Home is the signed-in user's queue, not the global catalog. Provision the
+      ;; test user (first authed request), then queue the seeded readables for them
+      ;; so the page has something to render.
+      (-> (mock/request :get "/") test-auth/authed handler)
+      (let [uid (:users/id (crud/find-1 ds :users {:email test-auth/invited-email}))]
+        (reading/enqueue! ds uid "article"
+                          (:articles/id (crud/find-1 ds :articles {:canonical-url "https://www.newyorker.com/the-white-album"})))
+        (reading/enqueue! ds uid "paper"
+                          (:papers/id (crud/find-1 ds :papers {:title "Attention Is All You Need"})))
+        (reading/enqueue! ds uid "newsletter_issue"
+                          (:newsletter-issues/id (crud/find-1 ds :newsletter-issues {:subject "ACT links for the week"}))))
 
-      (testing "GET / renders the reading list from seeded data"
+      (testing "GET / renders the signed-in user's reading queue"
         (let [{:keys [status headers body]} (-> (mock/request :get "/") test-auth/authed handler)]
           (is (= 200 status))
           (is (re-find #"(?i)text/html" (get headers "content-type")))
@@ -27,6 +40,7 @@
           (is (re-find #"Attention Is All You Need" body) "a paper title shows")
           (is (re-find #"Joan Didion" body) "an author byline shows")
           (is (re-find #"/authors/joan-didion" body) "author names link to their page")
+          (is (re-find #"action=\"/queue/" body) "each item has an archive control")
           (is (re-find #"action=\"/logout\"" body) "a sign-out control is present")))
 
       (testing "GET /authors lists authors"
@@ -65,7 +79,7 @@
       (testing "Unknown routes return 404"
         (is (= 404 (:status (-> (mock/request :get "/no-such-route") handler))))))))
 
-(deftest article-create-and-delete
+(deftest article-create-and-archive
   (with-system [system]
     (let [ds       (:reader.db/datasource system)
           handler  (:reader.concerns.reitit/ring-handler system)
@@ -79,7 +93,7 @@
           (is (re-find #"(?i)<form" body))
           (is (re-find #"canonical-url" body))))
 
-      (testing "POST /articles with valid input creates the article and redirects"
+      (testing "POST /articles with valid input creates the article, queues it, and redirects"
         (let [{:keys [status headers]}
               (-> (mock/request :post "/articles"
                                 {"title"         "A Hand-Added Piece"
@@ -88,6 +102,17 @@
           (is (= 303 status))
           (is (= "/" (get headers "location")))
           (is (on-home? "A Hand-Added Piece") "the new article shows on the reading list")))
+
+      (testing "POST /articles with a duplicate URL re-renders the form, no 500"
+        ;; The create+enqueue transaction must survive create!'s caught unique
+        ;; violation: the article insert rolls back and we re-render, not 500.
+        (let [{:keys [status body]}
+              (-> (mock/request :post "/articles"
+                                {"title"         "A Hand-Added Piece, Again"
+                                 "canonical-url" "https://example.com/hand-added"})
+                  test-auth/authed handler)]
+          (is (= 200 status) "not a 500 from the aborted insert")
+          (is (re-find #"(?i)already exists" body) "the duplicate-URL error shows")))
 
       (testing "POST /articles with a blank title re-renders the form and writes nothing"
         (let [{:keys [status body]}
@@ -98,30 +123,28 @@
           (is (re-find #"(?i)<form" body))
           (is (nil? (crud/find-1 ds :articles {:canonical-url "https://example.com/rejected"})))))
 
-      (testing "POST /readables/articles/:id/delete removes the article and redirects"
-        (let [id (:articles/id (crud/find-1 ds :articles {:canonical-url "https://example.com/hand-added"}))
-              {:keys [status headers]} (-> (mock/request :post (str "/readables/articles/" id "/delete"))
+      (testing "POST /queue/:id/archive removes the item from the reading list"
+        (let [uid (:users/id (crud/find-1 ds :users {:email test-auth/invited-email}))
+              aid (:articles/id (crud/find-1 ds :articles {:canonical-url "https://example.com/hand-added"}))
+              qid (:queue-items/id (crud/find-1 ds :queue-items {:user-id uid :readable-id aid}))
+              {:keys [status headers]} (-> (mock/request :post (str "/queue/" qid "/archive"))
                                            test-auth/authed handler)]
           (is (= 303 status))
           (is (= "/" (get headers "location")))
           (is (not (on-home? "A Hand-Added Piece")) "it is gone from the reading list")))
 
-      (testing "POST /readables/:table/:id/delete removes a non-article readable too"
-        (let [id (:papers/id (crud/create! ds :papers {:title          "A Paper To Remove"
-                                                       :pdf-object-key "papers/remove.pdf"}))
-              {:keys [status headers]} (-> (mock/request :post (str "/readables/papers/" id "/delete"))
-                                           test-auth/authed handler)]
-          (is (= 303 status))
-          (is (= "/" (get headers "location")))
-          (is (nil? (crud/find-1 ds :papers {:id id})) "the paper row is gone")))
-
-      (testing "POST /readables/:table/:id/delete with a non-uuid id 404s"
-        (is (= 404 (:status (-> (mock/request :post "/readables/articles/not-a-uuid/delete")
+      (testing "POST /queue/:id/archive with a non-uuid id 404s"
+        (is (= 404 (:status (-> (mock/request :post "/queue/not-a-uuid/archive")
                                 test-auth/authed handler)))))
 
-      (testing "POST /readables/:table/:id/delete refuses a table that isn't a readable"
-        (is (= 404 (:status (-> (mock/request :post (str "/readables/users/" (random-uuid) "/delete"))
-                                test-auth/authed handler))))))))
+      (testing "POST /queue/:id/archive refuses another user's item, leaving it untouched"
+        (let [other (:users/id (crud/create! ds :users {:email "intruder@x.test"}))
+              paper (:papers/id (crud/create! ds :papers {:title "Theirs" :pdf-object-key "papers/theirs.pdf"}))
+              qid   (:queue-items/id (reading/enqueue! ds other "paper" paper))]
+          (is (= 404 (:status (-> (mock/request :post (str "/queue/" qid "/archive"))
+                                  test-auth/authed handler))))
+          (is (= "unread" (:queue-items/state (crud/find-1 ds :queue-items {:id qid})))
+              "their queue item is not archived"))))))
 
 (deftest csrf-gate-is-mounted
   ;; Proves the CSRF middleware actually sits in front of the stack, not just

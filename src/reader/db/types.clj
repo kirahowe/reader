@@ -37,8 +37,10 @@
   (read-column-by-label [obj _]
     (case (.getType obj)
       ("json" "jsonb") (jsonb->clj obj)
+      "citext"         (.getValue obj)
       obj))
   (read-column-by-index [obj _ _]
     (case (.getType obj)
       ("json" "jsonb") (jsonb->clj obj)
+      "citext"         (.getValue obj)
       obj)))

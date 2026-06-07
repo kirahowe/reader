@@ -20,3 +20,14 @@
   "A 404 HTML page."
   [message]
   (html 404 (layout/not-found message)))
+
+(defn forbidden
+  "A 403 HTML page."
+  [message]
+  (html 403 (layout/forbidden message)))
+
+(defn expire-cookie
+  "Add a Set-Cookie header to `response` that immediately expires cookie `name`."
+  [response name]
+  (assoc-in response [:headers "set-cookie"]
+            (str name "=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")))

@@ -26,3 +26,14 @@
          [:h1 "Not found"]
          [:p.muted message]
          [:p [:a {:href "/"} "Back to your reading list"]]]))
+
+(defn forbidden
+  "The body for a 403. Offers a sign-out so a signed-in but un-invited visitor
+   isn't stuck — `/logout` is public, so it works even without access."
+  [message]
+  (page "Not allowed"
+        [:main
+         [:h1 "Not allowed"]
+         [:p.muted message]
+         [:form {:method "post" :action "/logout"}
+          [:button {:type "submit"} "Sign out"]]]))

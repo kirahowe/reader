@@ -3,6 +3,7 @@
   init-keys. Required (transitively) by any entry point that reads
   the system config or calls `ig/load-namespaces`."
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [integrant.core :as ig]))
 
 ;; ---------- Constants ----------
@@ -49,10 +50,27 @@
   [arg]
   (->Secret (env arg)))
 
+(defn- csv->set
+  "Comma-separated string -> set of trimmed, non-blank entries (empty set for
+   nil or blank input)."
+  [s]
+  (->> (str/split (or s "") #",")
+       (map str/trim)
+       (remove str/blank?)
+       set))
+
+(defn env-set
+  "#env/set -- optional env var split on commas into a set of trimmed,
+   non-blank strings (empty set when unset). Used for the prod invite
+   allowlist so testers can be added via a Fly secret, no redeploy."
+  [arg]
+  (csv->set (env-opt arg)))
+
 (def readers
   {'env        env
    'env/opt    env-opt
    'env/long   env-long
    'env/bool   env-bool
    'env/secret env-secret
+   'env/set    env-set
    'resource   io/resource})

@@ -53,14 +53,12 @@
   (when-not (m/validate form-schema attrs)
     (me/humanize (m/explain form-schema attrs))))
 
-(defn- duplicate-url? [^java.sql.SQLException e]
-  ;; Postgres unique_violation
-  (= "23505" (.getSQLState e)))
-
 (defn create!
   "Parse, validate, and insert an article. Returns {:article row} on success,
-   {:errors m} on invalid input, or {:errors {:canonical-url …}} when the
-   canonical URL already exists (the one expected DB-level failure)."
+   or {:errors m} for invalid input or an expected DB-level rejection: a
+   canonical URL that already exists, or an affiliation-id with no matching
+   source (a well-formed but stale/forged id slips past validation and trips
+   the FK)."
   [ds params]
   (let [attrs (parse-form params)]
     (if-let [errors (validate attrs)]
@@ -72,6 +70,7 @@
                                     (cond-> (:affiliation-id attrs)
                                       (update :affiliation-id parse-uuid))))}
         (catch java.sql.SQLException e
-          (if (duplicate-url? e)
-            {:errors {:canonical-url ["An article with that URL already exists."]}}
+          (case (.getSQLState e)
+            "23505" {:errors {:canonical-url ["An article with that URL already exists."]}}
+            "23503" {:errors {:affiliation-id ["Unknown source."]}}
             (throw e)))))))

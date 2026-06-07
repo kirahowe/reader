@@ -78,6 +78,19 @@
           (is (nil? article))
           (is (contains? errors :canonical-url))))
 
+      (testing "a well-formed but non-existent affiliation-id is reported, not thrown"
+        ;; Passes the Malli uuid check but has no matching row, so the insert
+        ;; trips a foreign-key violation (23503). That must surface as a form
+        ;; error, the same as the duplicate-url case — never a thrown 500.
+        (let [{:keys [article errors]}
+              (articles/create! ds {"title"          "Orphaned"
+                                    "canonical-url"  "https://example.com/orphan"
+                                    "affiliation-id" "00000000-0000-0000-0000-0000000000ff"})]
+          (is (nil? article))
+          (is (= ["Unknown source."] (:affiliation-id errors)))
+          (is (nil? (crud/find-1 ds :articles {:canonical-url "https://example.com/orphan"}))
+              "nothing is inserted when the affiliation doesn't exist")))
+
       (testing "invalid input is reported and writes nothing"
         (let [{:keys [article errors]}
               (articles/create! ds {"title"         "  "

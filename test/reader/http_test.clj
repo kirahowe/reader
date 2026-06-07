@@ -130,6 +130,19 @@
           (is (= 200 status) "not a 500 from the aborted insert")
           (is (re-find #"(?i)already exists" body) "the duplicate-URL error shows")))
 
+      (testing "POST /articles with an unknown affiliation-id re-renders the form, no 500"
+        ;; A well-formed but non-existent affiliation-id passes validation and
+        ;; trips the FK on insert; like the duplicate-URL case it must come back
+        ;; as a visible form error, not a 500 from the aborted insert.
+        (let [{:keys [status body]}
+              (-> (mock/request :post "/articles"
+                                {"title"          "Orphaned Submission"
+                                 "canonical-url"  "https://example.com/orphan-http"
+                                 "affiliation-id" "00000000-0000-0000-0000-0000000000ff"})
+                  test-auth/authed handler)]
+          (is (= 200 status) "not a 500 from the aborted insert")
+          (is (re-find #"(?i)unknown source" body) "the unknown-affiliation error shows")))
+
       (testing "POST /articles with a blank title re-renders the form and writes nothing"
         (let [{:keys [status body]}
               (-> (mock/request :post "/articles"

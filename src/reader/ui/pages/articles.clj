@@ -8,7 +8,7 @@
    [:input {:type "text" :name input-name :value value}]
    (when error [:span.error (first error)])])
 
-(defn- source-select [affiliations selected]
+(defn- source-select [affiliations selected error]
   [:label
    [:span.label-text "Source"]
    (into [:select {:name "affiliation-id"}
@@ -18,7 +18,8 @@
                   [:option (cond-> {:value id}
                              (= id selected) (assoc :selected true))
                    (:affiliations/name a)]))
-              affiliations))])
+              affiliations))
+   (when error [:span.error (first error)])])
 
 (defn new-form
   "The add-article form. `affiliations` fills the source select; `values`
@@ -33,7 +34,7 @@
      [:form.form {:method "post" :action "/articles"}
       (text-field "Title" "title" (get values "title") (:title errors))
       (text-field "URL" "canonical-url" (get values "canonical-url") (:canonical-url errors))
-      (source-select affiliations (get values "affiliation-id"))
+      (source-select affiliations (get values "affiliation-id") (:affiliation-id errors))
       [:label
        [:span.label-text "Abstract"]
        [:textarea {:name "abstract"} (get values "abstract")]]

@@ -5,14 +5,30 @@
    ring-mock requests. The app routes are auth-protected, so requests to them
    carry a session cookie (`reader.test-support.test-auth/authed`); `/health` and
    `/static` are public and don't. POSTs carry a real form-encoded body, so the
-   parameters middleware is exercised alongside the handlers."
+   parameters middleware is exercised alongside the handlers. The lone
+   over-the-wire test, `end-to-end-server-binds-and-serves`, instead reaches the
+   bound ephemeral port with a real HTTP client, proving http-kit serves and the
+   middleware stack runs in the actual server path."
   (:require [clojure.test :refer [deftest is testing]]
+            [org.httpkit.server :as http]
             [reader.db.crud :as crud]
             [reader.dev.seed :as seed]
             [reader.reading :as reading]
             [reader.test-support.auth :as test-auth]
             [reader.test-support.setup :refer [with-system]]
-            [ring.mock.request :as mock]))
+            [ring.mock.request :as mock])
+  (:import (java.net URI)
+           (java.net.http HttpClient HttpRequest HttpResponse$BodyHandlers)))
+
+(defn- GET
+  "A real over-the-wire GET to the running test server. HttpClient's default
+   redirect policy is NEVER, so a redirect is observed rather than followed."
+  [port path]
+  (let [req (-> (HttpRequest/newBuilder)
+                (.uri (URI/create (str "http://localhost:" port path)))
+                (.GET)
+                (.build))]
+    (.send (HttpClient/newHttpClient) req (HttpResponse$BodyHandlers/ofString))))
 
 (deftest routes-via-handler
   (with-system [system]
@@ -169,3 +185,20 @@
                                    (mock/header "origin" "http://localhost")
                                    test-auth/authed handler)]
           (is (= 303 status) "matching origin reaches the create handler and redirects"))))))
+
+(deftest end-to-end-server-binds-and-serves
+  ;; Everything above drives the ring handler directly; this is the one test
+  ;; that goes over a real socket to the port http-kit actually bound.
+  (with-system [system]
+    (let [port (http/server-port (:reader.concerns/http-kit system))]
+      (is (pos? port) "http-kit bound to an ephemeral port")
+
+      (testing "GET /health over the wire"
+        (let [resp (GET port "/health")]
+          (is (= 200 (.statusCode resp)))
+          (is (= "ok" (.body resp)))))
+
+      (testing "an unauthenticated GET / redirects to /login over the wire"
+        (let [resp (GET port "/")]
+          (is (= 303 (.statusCode resp)))
+          (is (= "/login" (.. resp headers (firstValue "location") (orElse nil)))))))))

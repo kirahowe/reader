@@ -42,7 +42,9 @@
     [:nav.index-nav.muted
      [:a {:href "/articles/new"} "Add article"] " · "
      [:a {:href "/authors"} "All authors"] " · "
-     [:a {:href "/affiliations"} "All sources"]]
+     [:a {:href "/affiliations"} "All sources"] " · "
+     [:form.logout {:method "post" :action "/logout"}
+      [:button {:type "submit"} "Sign out"]]]
     (if (seq readables)
       (into [:ul.readables] (map item readables))
       [:p.muted "Nothing here yet."])]))

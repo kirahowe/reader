@@ -57,24 +57,47 @@ boots with the db wired and nREPL listening on `:7888`.
 
 ---
 
-## Step 3 — Authentication
+## Step 3 — Authentication ✅
 
-Hanko handles login. The application verifies JWTs and maps subjects
-to `users` rows.
+Hanko Cloud handles login. The app verifies the session JWT against
+Hanko's JWKS and maps the subject/email to a `users` row, provisioning
+only invited addresses.
+
+Reality check vs. the original sketch: Hanko has no OAuth-style
+`/auth/callback`. Login is driven by Hanko's frontend element, which
+sets an HttpOnly `hanko` cookie (a signed JWT) client-side; the backend
+just verifies that cookie. So there is no magic-link form and no server
+callback route.
 
 **Components**
-- `:reader.auth/hanko-jwks` — fetched and cached JWK set
-- `reader.http.middleware.auth` — verifies the cookie JWT, attaches
-  `:user-id` to the request, redirects to `/login` if missing
-- `reader.ui.pages.login` — magic-link form
-- A small set of routes: `/login`, `/auth/callback`, `/logout`
+- `reader.auth` — verifies the `hanko` JWT against the JWKS (via
+  `clj-jwt`, which fetches/caches the key set and handles rotation),
+  plus pure claim→attrs and allowlist helpers.
+- `reader.auth.middleware` — default-deny gate: `:public?` routes pass;
+  otherwise verify the cookie, load/provision the invited user, attach
+  `:user`/`:user-id`, redirect a browser GET to `/login` (401 for other
+  methods, 403 for a valid-but-uninvited identity).
+- `reader.users` — find-or-provision from a verified identity.
+- `reader.web.csrf` — Origin/Referer check on unsafe methods, since the
+  cookie session introduces a CSRF surface.
+- `reader.ui.pages.login` + `reader.handlers.auth` — the `<hanko-auth>`
+  element island and the `/login` / `/logout` routes.
 
-**Done when**
-- Logging in over magic link establishes a session; logout clears it.
-- Protected routes (everything except `/`, `/login`, `/auth/callback`,
-  `/health`, `/api/inbound`, `/static/*`) require a valid session.
-- Tests cover JWT verification, the missing/expired/invalid paths, and
-  a happy-path login round-trip.
+**Done when** *(met)*
+- Signing in via the Hanko element establishes a session; logout clears
+  the cookie.
+- Protected routes (everything except `/login`, `/logout`, `/health`,
+  `/static/*`) require a valid session, and only allowlisted emails are
+  provisioned.
+- Tests cover JWT verification (valid / expired / tampered / malformed),
+  the allowlist gate, and the redirect / 401 / 403 paths.
+
+Invite allowlist is config: a set in dev, `#env/set "ALLOWED_EMAILS"`
+(a Fly secret) in prod. It gates *provisioning* only — adding an address
+lets that person sign in, but removing one does **not** revoke a user
+who has already signed in (their `users` row stands); revoke by deleting
+the row. Manual setup still needed: create the Hanko Cloud project and
+fill the `CHANGEME` URLs in `dev.edn` (and the prod secrets).
 
 ---
 

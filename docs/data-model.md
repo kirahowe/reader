@@ -202,6 +202,12 @@ The reading queue.
 Unique constraint: `(user_id, readable_type, readable_id)` — the same
 user can only have one queue item per readable.
 
+Removing an item from the list is a soft archive (`state = 'archived'`):
+the row stays and the shared readable is never touched. Because of the
+unique constraint, re-adding the same readable reactivates the existing
+row — `enqueue!` upserts, resetting it to `unread` — rather than
+inserting a duplicate or erroring.
+
 ### `jobs`
 Durable background work.
 

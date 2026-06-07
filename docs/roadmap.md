@@ -101,25 +101,49 @@ fill the `CHANGEME` URLs in `dev.edn` (and the prod secrets).
 
 ---
 
-## Step 4 — Reading queue (read side)
+## Step 4 — Reading queue (read side) 🚧
 
-Users can see what's in their queue and open one item.
+Users can see what's in their queue, archive items, and add an article
+by URL. Opening an item (the reader view) is the remaining slice.
 
-**Components**
-- Routes: `GET /queue`, `GET /readable/:id` (dispatched by type),
-  `POST /queue/:id/mark-read`, `POST /queue/:id/archive`
-- `reader.reading.*` — domain functions for the queue and the reader
-  view
-- `reader.ui.pages.queue`, `reader.ui.pages.reader`
-- HTMX swaps for state changes — no full page reload to mark something
-  read.
+**Reality check vs. the original sketch**
+- The queue renders on `GET /` — the home page *is* the reading list —
+  not a separate `GET /queue`. There's no `reader.ui.pages.queue`;
+  `reader.ui.pages.home` renders it.
+- Removal is a soft **archive** (`POST /queue/:id/archive` flips the
+  row's `state` to `archived`), not a hard delete. The earlier thin UI
+  deleted the underlying readable via `/readables/:table/:id/delete`;
+  that route and handler are gone. Re-adding an archived readable
+  reactivates the same row (`enqueue!` upserts) rather than tripping the
+  per-user unique constraint.
+- State changes are a plain `POST` → `303` redirect (full server
+  render), not an HTMX in-place swap. HTMX for mark-read is deferred
+  until the reader view lands.
+- `reader.reading/enqueue!` already exists and `POST /articles`
+  enqueues a hand-added article in the **same transaction** as the
+  insert — a manual-ingest primitive that arrives ahead of Step 5
+  (no async job or extraction yet).
 
-**Done when**
-- A queue with hand-seeded data renders correctly.
-- Mark-read and archive flip the row and update the view in-place.
-- A readable page renders the body for an article, a PDF object for a
-  paper (just the link to R2 for now — viewer comes later), and the
-  HTML body for a newsletter issue.
+**Delivered**
+- `reader.reading` — per-user queue assembly (scoped reads via
+  `reader.readables/catalog-of`, so a render touches only the user's
+  queued readables, not the whole library), `enqueue!` (upsert), and
+  owner-scoped `archive!`.
+- `reader.handlers.queue` — `POST /queue/:id/archive`, owner-scoped (a
+  forged or missing id answers 404).
+- Home renders the signed-in user's active queue, newest-first, with a
+  per-item archive control and a queue-state label.
+- `reader.db.crud` gains `find-in` (scoped `IN` reads) and `upsert!`.
+- Tests across the HTTP stack, the queue domain (enqueue / archive /
+  re-add / cross-user isolation), and the pure catalog assembly. Seed
+  now provisions two users whose queues overlap on shared readables.
+
+**Still pending**
+- `GET /readable/:id` (dispatched by type) + `reader.ui.pages.reader` —
+  render an article body, a paper's PDF link (R2 viewer comes later),
+  and a newsletter issue's HTML body.
+- `POST /queue/:id/mark-read` plus the HTMX in-place swap for state
+  changes — no full page reload to mark something read.
 
 ---
 

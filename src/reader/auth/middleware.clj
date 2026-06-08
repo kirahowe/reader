@@ -45,6 +45,12 @@
     (response/see-other "/login")
     {:status 401 :headers {"content-type" "text/plain"} :body "unauthenticated"}))
 
+(defn- jwks-url-for
+  "Hanko serves its JWK Set at the well-known path off the API base, so the JWKS
+   URL is fully determined by `api-url` — real environments supply only the base."
+  [api-url]
+  (str (str/replace (str api-url) #"/+$" "") "/.well-known/jwks.json"))
+
 (defn wrap-auth [handler {:keys [jwks-url issuer datasource allowed-emails]}]
   (fn [req]
     (if (public? req)
@@ -56,8 +62,11 @@
         (unauthenticated req)))))
 
 (defmethod ig/init-key :reader.auth/middleware
-  [_ {:keys [jwks-url issuer datasource allowed-emails]}]
-  (let [allowed (into #{} (map str/lower-case) allowed-emails)]
+  [_ {:keys [jwks-url api-url issuer datasource allowed-emails]}]
+  ;; Derive the JWKS URL from the Hanko API base; an explicit `jwks-url` still
+  ;; wins so tests verify against a committed local JWKS (see test.edn).
+  (let [jwks-url (or jwks-url (jwks-url-for api-url))
+        allowed  (into #{} (map str/lower-case) allowed-emails)]
     {:name ::auth
      :wrap (fn [handler]
              (wrap-auth handler {:jwks-url       jwks-url

@@ -187,31 +187,23 @@ or pull it from a connected REPL:
 
 ### Production (Neon)
 
-Prod connects to Neon through a single `DATABASE_URL` environment
-variable — the full JDBC URL, credentials and SSL mode included. One
-time setup:
+Prod connects to Neon through a single `DATABASE_URL` — the full JDBC
+URL, credentials and SSL mode included. To build it:
 
-1. Create a Neon project (pick a region close to `yyz` to keep latency
-   down). Neon provisions a database and a role for you.
-2. Copy the connection string from the Neon dashboard and put it in
-   JDBC form — prefix `jdbc:` and keep `?sslmode=require`, since Neon
-   requires TLS:
+1. Create a [Neon](https://neon.tech) project near `yyz` (where the app
+   runs). Neon provisions a database and role.
+2. Take the dashboard connection string and put it in JDBC form: prefix
+   `jdbc:` and keep `?sslmode=require` (Neon requires TLS).
 
    ```
    jdbc:postgresql://<user>:<password>@<host>.neon.tech/<db>?sslmode=require
    ```
 
-3. Hand it to the app as a Fly secret (never commit it):
-
-   ```sh
-   flyctl secrets set DATABASE_URL="jdbc:postgresql://…?sslmode=require"
-   ```
-
-That is all the database wiring prod needs. On the next deploy the
-machine boots, `:reader.db/datasource` opens a pool against Neon, and
-`:reader.db/migrator` applies any pending migrations before the app
-serves traffic. `DATABASE_URL` is required in prod — the system
-refuses to start without it rather than coming up half-wired.
+Set it as a Fly secret with the rest in [One-time production
+setup](#one-time-production-setup) — never commit it. On the next deploy
+`:reader.db/datasource` pools against Neon and `:reader.db/migrator`
+applies pending migrations before traffic is served; the system refuses
+to start without `DATABASE_URL` rather than coming up half-wired.
 
 ## Deployment
 
@@ -219,8 +211,9 @@ Production runs on a single Fly.io machine in `yyz`, fronted by
 Fly's HTTPS edge, with Neon for Postgres and Cloudflare R2 for blob
 storage. The unit of deployment is a container image built from the
 multi-stage [`Dockerfile`](Dockerfile), which produces an
-`eclipse-temurin:25-jre` image with the uberjar baked in and
-`ENTRYPOINT ["java", "-jar", "/app/reader.jar", "prod.edn"]`.
+`eclipse-temurin:25-jre` image with the uberjar at `/app/reader.jar`
+and the prod profile at `/app/conf/prod.edn`, run via
+`ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar", "reader.main", "prod.edn"]`.
 
 ### Automatic (the normal path)
 
@@ -245,18 +238,71 @@ bb deploy   # flyctl deploy --remote-only
 Fly app already existing. If any of those are missing the task runner
 should give you an actionable hint to help get unstuck.
 
-### One-time Fly.io setup
+### One-time production setup
 
-Fly app names are globally unique across the entire platform, so
-the default `reader` is almost certainly taken. Edit `fly.toml`'s
-`app = "..."` to something namespaced to you (e.g.
-`kirahowe-reader`) first, then:
+A fresh production deployment needs the Fly app created, its backing
+services provisioned, its runtime secrets set, and a deploy token wired
+into CI. Do these once.
+
+**1. Create the Fly app.** App names are globally unique across the
+entire platform, so the default `reader` is almost certainly taken.
+Edit `fly.toml`'s `app = "..."` to something namespaced to you (e.g.
+`kirahowe-reader`), then:
 
 ```sh
 flyctl auth login   # if not already
 bb fly:init         # create the Fly app named in fly.toml
-bb deploy
 ```
+
+**2. Provision the backing services.** Create the Neon database (see
+[Production (Neon)](#production-neon) for the connection string) and a
+production [Hanko Cloud](https://cloud.hanko.io) project. Set the
+project's **app URL** to your public origin: passkeys are WebAuthn and
+origin-bound, so a project pointed at `localhost` won't authenticate on
+the deployed domain. Its API URL (e.g. `https://<id>.hanko.io`) is the
+`HANKO_API_URL` the app needs.
+
+**3. Set the runtime secrets.** The prod profile reads four values from
+the environment — every `#env` literal in
+[`env/prod/resources/prod.edn`](env/prod/resources/prod.edn). `PORT`
+comes from `fly.toml`; the rest are secrets, set in one shot (a single
+`secrets set` triggers a single redeploy):
+
+```sh
+flyctl secrets set \
+  DATABASE_URL="jdbc:postgresql://<user>:<pass>@<host>.neon.tech/<db>?sslmode=require" \
+  SITE_ORIGIN="https://kirahowe-reader.fly.dev" \
+  HANKO_API_URL="https://<id>.hanko.io" \
+  ALLOWED_EMAILS="you@example.com,friend@example.com"
+```
+
+| Secret | What it is |
+| ------ | ---------- |
+| `DATABASE_URL`   | Full Neon JDBC URL, credentials + `?sslmode=require` (see [Production (Neon)](#production-neon)) |
+| `SITE_ORIGIN`    | Public origin of the app; the CSRF check compares request origins against it |
+| `HANKO_API_URL`  | Hanko project base URL; the sign-in page's `<hanko-auth>` element talks to it, and the auth middleware derives the JWKS URL (`<api-url>/.well-known/jwks.json`) from it to verify session JWTs |
+| `ALLOWED_EMAILS` | Comma-separated invite allowlist gating *provisioning* only. Optional — unset provisions no one; add testers later with a plain `secrets set`, no redeploy of code |
+
+All but `ALLOWED_EMAILS` are required: the system refuses to start
+without them rather than coming up half-wired. Verify with `flyctl
+secrets list` (it shows names and digests, never values).
+
+**4. Authorize CI to deploy.** The `deploy` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) authenticates to
+Fly with a `FLY_API_TOKEN` GitHub Actions secret. Without it the deploy
+fails with `Error: no access token available`. Mint a deploy token
+scoped to the app and store it on the repo:
+
+```sh
+fly tokens create deploy -a kirahowe-reader -x 999999h \
+  | gh secret set FLY_API_TOKEN --repo <owner>/<repo>
+```
+
+Piping straight into `gh` keeps the token out of your shell history and
+terminal scrollback; confirm it landed with `gh secret list`.
+
+With all four done, deploy — `bb deploy`, or push to `main` and let CI
+do it — and watch the rollout with `flyctl logs`.
 
 ### Configuration
 
@@ -268,13 +314,16 @@ top:
 resources/base-system.edn          # defaults, always loaded
 env/dev/resources/dev.edn          # bb dev → -m reader.dev.main
 env/test/resources/test.edn        # bb test
-env/prod/resources/prod.edn        # baked into the uberjar
+env/prod/resources/prod.edn        # in the image at /app/conf, on the classpath
 ```
 
 The few values that must come from the environment — the HTTP `PORT`,
-and in prod the `DATABASE_URL` Neon connection string — are pulled in
-inline via reader literals like `#env/long ["PORT" 8080]` and
-`#env "DATABASE_URL"`.
+and in prod the database connection string and auth config
+(`DATABASE_URL`, `SITE_ORIGIN`, `HANKO_API_URL`, `ALLOWED_EMAILS`) — are
+pulled in inline via reader literals like `#env/long ["PORT" 8080]` and
+`#env "DATABASE_URL"`. See [One-time production
+setup](#one-time-production-setup) for how those are supplied as Fly
+secrets and a CI deploy token.
 
 ## Useful docs
 

@@ -30,13 +30,14 @@
   :migrations-path "migrations"}
 
  ;; Auth. SITE_ORIGIN is the public origin (e.g. https://reader.example.com)
- ;; for the CSRF check; HANKO_API_URL is the Hanko Cloud project base and
- ;; HANKO_JWKS_URL its /.well-known/jwks.json. ALLOWED_EMAILS is a
- ;; comma-separated invite list, settable as a Fly secret without a redeploy.
+ ;; for the CSRF check; HANKO_API_URL is the Hanko Cloud project base — the
+ ;; middleware derives the JWKS URL (base + /.well-known/jwks.json) from it,
+ ;; so there is no separate JWKS env var. ALLOWED_EMAILS is a comma-separated
+ ;; invite list, settable as a Fly secret without a redeploy.
  :reader.web/csrf {:site-origin #env "SITE_ORIGIN"}
 
  :reader.auth/middleware
- {:jwks-url       #env "HANKO_JWKS_URL"
+ {:api-url        #env "HANKO_API_URL"
   :allowed-emails #env/set "ALLOWED_EMAILS"}
 
  :reader.handlers.auth/login {:api-url #env "HANKO_API_URL"}}

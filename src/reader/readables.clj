@@ -66,6 +66,23 @@
 (defn- affiliation-ids [table rows]
   (keep #(get % (keyword (name table) "affiliation-id")) rows))
 
+(defn- catalog-from-rows
+  "Given already-fetched readable rows per table (:articles/:papers/:newsletter-issues),
+   fetch their affiliations, authorships, and authors and assemble the normalized catalog."
+  [ds {:keys [articles papers newsletter-issues] :as readables}]
+  (let [aff-ids      (distinct (concat (affiliation-ids :articles articles)
+                                       (affiliation-ids :papers papers)
+                                       (affiliation-ids :newsletter-issues newsletter-issues)))
+        readable-ids (distinct (concat (map :articles/id articles)
+                                       (map :papers/id papers)
+                                       (map :newsletter-issues/id newsletter-issues)))
+        authorships  (crud/find-in ds :authorships :readable-id readable-ids)
+        author-ids   (distinct (map :authorships/author-id authorships))]
+    (assemble (assoc readables
+                     :affiliations (crud/find-in ds :affiliations :id aff-ids)
+                     :authorships  authorships
+                     :authors      (crud/find-in ds :authors :id author-ids)))))
+
 (defn catalog-of
   "Every readable named by `refs`, normalized and joined to source + authors.
    `refs` is a seq of `[type id]` pairs (the `:type`/`:id` a normalized item
@@ -74,18 +91,19 @@
    draws on this touches only what the user has queued, not the whole library."
   [ds refs]
   (let [ids-by-table (-> (group-by (comp type->table first) refs)
-                         (update-vals #(distinct (map second %))))
-        articles     (crud/find-in ds :articles          :id (:articles ids-by-table))
-        papers       (crud/find-in ds :papers            :id (:papers ids-by-table))
-        issues       (crud/find-in ds :newsletter-issues :id (:newsletter-issues ids-by-table))
-        aff-ids      (distinct (concat (affiliation-ids :articles articles)
-                                       (affiliation-ids :papers papers)
-                                       (affiliation-ids :newsletter-issues issues)))
-        authorships  (crud/find-in ds :authorships :readable-id (distinct (map second refs)))
-        author-ids   (distinct (map :authorships/author-id authorships))]
-    (assemble {:articles          articles
-               :papers            papers
-               :newsletter-issues issues
-               :affiliations      (crud/find-in ds :affiliations :id aff-ids)
-               :authorships       authorships
-               :authors           (crud/find-in ds :authors :id author-ids)})))
+                         (update-vals #(distinct (map second %))))]
+    (catalog-from-rows ds
+                       {:articles          (crud/find-in ds :articles          :id (:articles ids-by-table))
+                        :papers            (crud/find-in ds :papers            :id (:papers ids-by-table))
+                        :newsletter-issues (crud/find-in ds :newsletter-issues :id (:newsletter-issues ids-by-table))})))
+
+(defn find-one
+  "The full readable named by `[type id]`: its normalized item (title, source,
+   authors — the list shape) under :item, plus the raw row (body, abstract,
+   links, …) under :row. nil for an unknown type or a missing row. `catalog-of`
+   deliberately omits bodies, so the reader view needs this single full fetch."
+  [ds type id]
+  (when-let [table (type->table type)]
+    (when-let [row (crud/by-id ds table id)]
+      {:item (first (catalog-from-rows ds {table [row]}))
+       :row  row})))

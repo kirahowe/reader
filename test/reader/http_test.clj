@@ -53,6 +53,7 @@
           (is (re-find #"(?i)text/html" (get headers "content-type")))
           (is (re-find #"Your reading list" body))
           (is (re-find #"The White Album" body) "an article title shows")
+          (is (re-find #"href=\"/queue/[^\"]+\">The White Album" body) "titles link to the reader view")
           (is (re-find #"Attention Is All You Need" body) "a paper title shows")
           (is (re-find #"Joan Didion" body) "an author byline shows")
           (is (re-find #"/authors/joan-didion" body) "author names link to their page")
@@ -215,3 +216,70 @@
         (let [resp (GET port "/")]
           (is (= 303 (.statusCode resp)))
           (is (= "/login" (.. resp headers (firstValue "location") (orElse nil)))))))))
+
+(deftest reader-view-and-state
+  (with-system [system]
+    (let [ds      (:reader.db/datasource system)
+          handler (:reader.concerns.reitit/ring-handler system)]
+      (seed/seed! ds)
+      ;; Provision the test user (allowed@x.test — distinct from the seeded users,
+      ;; so its queue starts empty), then queue one readable of each type for it.
+      (-> (mock/request :get "/") test-auth/authed handler)
+      (let [uid   (:users/id (crud/find-1 ds :users {:email test-auth/invited-email}))
+            art   (:articles/id (crud/find-1 ds :articles {:canonical-url "https://www.newyorker.com/the-white-album"}))
+            pap   (:papers/id (crud/find-1 ds :papers {:title "Attention Is All You Need"}))
+            issue (:newsletter-issues/id (crud/find-1 ds :newsletter-issues {:subject "ACT links for the week"}))
+            qa    (:queue-items/id (reading/enqueue! ds uid "article" art))
+            qp    (:queue-items/id (reading/enqueue! ds uid "paper" pap))
+            qn    (:queue-items/id (reading/enqueue! ds uid "newsletter_issue" issue))
+            GET   (fn [path] (-> (mock/request :get path) test-auth/authed handler))
+            POST  (fn [path] (-> (mock/request :post path) test-auth/authed handler))]
+
+        (testing "GET /queue/:id renders an article reader view (byline, source, original link, control)"
+          (let [{:keys [status body]} (GET (str "/queue/" qa))]
+            (is (= 200 status))
+            (is (re-find #"The White Album" body) "the title shows")
+            (is (re-find #"Joan Didion" body) "the byline shows")
+            (is (re-find #"The New Yorker" body) "the source shows")
+            (is (re-find #"(?i)not available in the reader" body) "the placeholder body shows")
+            (is (re-find #"newyorker\.com/the-white-album" body) "links to the original")
+            (is (re-find #"action=\"/queue/[^\"]+/read\"" body) "a mark-read control is present"))
+          (let [row (crud/by-id ds :queue-items qa)]
+            (is (= "reading" (:queue-items/state row)) "the first open promotes it to reading")
+            (is (some? (:queue-items/started-at row)) "and stamps started_at")))
+
+        (testing "GET /queue/:id renders a paper reader view with DOI and arXiv links"
+          (let [{:keys [status body]} (GET (str "/queue/" qp))]
+            (is (= 200 status))
+            (is (re-find #"Attention Is All You Need" body))
+            (is (re-find #"doi\.org/10\.48550" body) "a DOI link")
+            (is (re-find #"arxiv\.org/abs/1706\.03762" body) "an arXiv link")))
+
+        (testing "GET /queue/:id renders a newsletter reader view"
+          (let [{:keys [status body]} (GET (str "/queue/" qn))]
+            (is (= 200 status))
+            (is (re-find #"ACT links for the week" body))))
+
+        (testing "POST /queue/:id/read marks it read and stays on the reader view"
+          (let [{:keys [status headers]} (POST (str "/queue/" qa "/read"))]
+            (is (= 303 status))
+            (is (= (str "/queue/" qa) (get headers "location")) "redirects back to the reader view"))
+          (is (= "read" (:queue-items/state (crud/by-id ds :queue-items qa))) "the change is persisted")
+          (is (re-find #"action=\"/queue/[^\"]+/unread\"" (:body (GET (str "/queue/" qa))))
+              "the control flips to mark-unread"))
+
+        (testing "POST /queue/:id/unread returns it to unread"
+          (is (= 303 (:status (POST (str "/queue/" qa "/unread")))))
+          (is (= "unread" (:queue-items/state (crud/by-id ds :queue-items qa)))))
+
+        (testing "the reader view 404s for a missing or non-uuid id"
+          (is (= 404 (:status (GET (str "/queue/" (random-uuid))))) "no such item")
+          (is (= 404 (:status (GET "/queue/not-a-uuid"))) "a non-uuid id"))
+
+        (testing "another user's item is unreadable and untouchable (per-user gating)"
+          (let [other (:users/id (crud/create! ds :users {:email "intruder@x.test"}))
+                their (:queue-items/id (reading/enqueue! ds other "article" art))]
+            (is (= 404 (:status (GET (str "/queue/" their)))) "GET 404s")
+            (is (= 404 (:status (POST (str "/queue/" their "/read")))) "POST 404s")
+            (is (= "unread" (:queue-items/state (crud/by-id ds :queue-items their)))
+                "their item is left untouched")))))))

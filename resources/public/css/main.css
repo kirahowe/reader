@@ -153,3 +153,30 @@ button:hover { border-color: var(--fg); }
   color: var(--bg);
 }
 .form button[type="submit"]:hover { filter: brightness(1.08); border-color: var(--accent); }
+
+/* Reader view */
+.reader-meta { font-size: 0.875rem; margin-bottom: var(--space-4); }
+
+.reader .prose { font-family: var(--font-prose); font-size: 1.125rem; line-height: 1.7; }
+.reader .prose > * + * { margin-top: var(--space-3); }
+.reader .prose h2, .reader .prose h3 { margin-top: var(--space-4); margin-bottom: var(--space-2); }
+.reader .prose blockquote {
+  margin: var(--space-3) 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--rule);
+  color: var(--muted);
+}
+.reader .prose .lead { font-size: 1.15rem; }
+.reader .prose .placeholder { font-style: italic; }
+
+/* External links (DOI, arXiv, the original) get a trailing ↗. */
+.reader-links { font-size: 0.9375rem; margin-top: var(--space-4); }
+.external::after { content: " ↗"; }
+
+.reader-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}

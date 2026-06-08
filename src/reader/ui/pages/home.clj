@@ -2,10 +2,8 @@
   "The home page: the reading list — every readable, with its source and
    byline. The author's own affiliation is deliberately not shown here; it
    lives on the author page."
-  (:require [reader.ui.layout :as layout]))
-
-(defn- author-link [{:keys [name slug]}]
-  [:a {:href (str "/authors/" slug)} name])
+  (:require [reader.ui.components :as components]
+            [reader.ui.layout :as layout]))
 
 (defn- meta-line
   "The subtle line under a title: queue state (when past unread), source, then
@@ -14,8 +12,7 @@
   [{:keys [state source authors]}]
   (let [state-frag  (when (and state (not= "unread" state)) [:span.queue-state state])
         source-frag (when source [:span (:name source)])
-        byline-frag (when (seq authors)
-                      (into [:span] (interpose ", " (map author-link authors))))
+        byline-frag (components/byline authors)
         parts       (remove nil? [state-frag source-frag byline-frag])]
     (when (seq parts)
       (into [:div.readable-meta.muted] (interpose " · " parts)))))
@@ -29,7 +26,7 @@
 (defn- item [{:keys [queue-item-id title] :as readable}]
   [:li.readable
    [:div.readable-text
-    [:div.readable-title title]
+    [:div.readable-title [:a {:href (str "/queue/" queue-item-id)} title]]
     (meta-line readable)]
    [:form.readable-actions {:method "post"
                             :action (str "/queue/" queue-item-id "/archive")}

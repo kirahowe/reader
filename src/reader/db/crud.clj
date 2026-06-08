@@ -92,13 +92,19 @@
                                   :returning     [:*]})
                      opts))
 
-(defn update! [ds table id attrs]
+(defn update-where!
+  "Update rows of `table` matching the HoneySQL `where` form, returning the
+   updated row (nil if none matched). `attrs` are encoded like `update!`."
+  [ds table where attrs]
   (jdbc/execute-one! ds
                      (sql/format {:update    table
                                   :set       (encode-values attrs)
-                                  :where     [:= :id id]
+                                  :where     where
                                   :returning [:*]})
                      opts))
+
+(defn update! [ds table id attrs]
+  (update-where! ds table [:= :id id] attrs))
 
 (defn delete! [ds table id]
   (jdbc/execute-one! ds

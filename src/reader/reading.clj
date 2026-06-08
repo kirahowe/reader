@@ -48,10 +48,75 @@
                  [:user-id :readable-type :readable-id]
                  {:state "unread" :added-at [:now]})))
 
-(defn archive!
-  "Archive `user-id`'s queue item, scoped so a user can only archive their own.
-   Returns the updated row, or nil when the item doesn't exist or isn't theirs."
+(defn- owned
+  "`user-id`'s queue item by id, or nil when it's missing or another user's.
+   The single owner-scope check the state-transition verbs share."
   [ds user-id queue-item-id]
   (when-let [item (crud/by-id ds :queue-items queue-item-id)]
     (when (= user-id (:queue-items/user-id item))
-      (crud/update! ds :queue-items queue-item-id {:state "archived"}))))
+      item)))
+
+(defn- start-reading!
+  "On first open, move `user-id`'s still-`unread` queue item to `reading` and stamp
+   `started-at`. Atomic and owner-scoped via the WHERE; returns the updated row, or
+   nil when the item was no longer unread (already reading/read/archived)."
+  [ds user-id queue-item-id]
+  (crud/update-where! ds :queue-items
+                      [:and
+                       [:= :id queue-item-id]
+                       [:= :user-id user-id]
+                       [:= :state "unread"]]
+                      {:state "reading" :started-at (java.time.Instant/now)}))
+
+(defn- transition!
+  "One atomic owner+state-scoped UPDATE: write `attrs` to `user-id`'s queue item
+   `queue-item-id`, but only while it is not archived. Returns the updated row, or
+   nil when the item is missing, isn't theirs, or is already archived. Gating
+   ownership and the archived guard in the WHERE makes this a single round-trip and
+   keeps an archived item off the active queue. Timestamps are app-side Instants —
+   a HoneySQL `[:now]` would be jsonb-encoded by `crud/update-where!`."
+  [ds user-id queue-item-id attrs]
+  (crud/update-where! ds :queue-items
+                      [:and
+                       [:= :id queue-item-id]
+                       [:= :user-id user-id]
+                       [:not= :state "archived"]]
+                      attrs))
+
+(defn archive!
+  "Archive `user-id`'s queue item (owner-scoped). Returns the updated row, or nil
+   when the item doesn't exist or isn't theirs. Re-adding later reactivates it
+   (see `enqueue!`)."
+  [ds user-id queue-item-id]
+  (transition! ds user-id queue-item-id {:state "archived"}))
+
+(defn mark-read!
+  "Mark `user-id`'s queue item read (owner-scoped); records `finished-at` and
+   preserves any existing `started-at`. An archived item is left untouched
+   (returns nil) so reading it can't resurrect it onto the active queue."
+  [ds user-id queue-item-id]
+  (transition! ds user-id queue-item-id {:state "read" :finished-at (java.time.Instant/now)}))
+
+(defn mark-unread!
+  "Return `user-id`'s queue item to unread (owner-scoped); clears its start and
+   finish timestamps. An archived item is left untouched (returns nil)."
+  [ds user-id queue-item-id]
+  (transition! ds user-id queue-item-id {:state "unread" :started-at nil :finished-at nil}))
+
+(defn open
+  "The reader payload for `user-id`'s queue item `queue-item-id`: the queue item
+   joined to its full readable (`reader.readables/find-one`), or nil when the
+   item is missing, isn't theirs, or its readable has since been removed. The
+   readable's type is threaded from the queue row, not re-derived. Marks an
+   `unread` item as `reading` on first open (stamping `started-at`), only once
+   ownership and the readable's existence are confirmed so we never stamp an item
+   we're about to 404."
+  [ds user-id queue-item-id]
+  (when-let [qi (owned ds user-id queue-item-id)]
+    (when-let [readable (readables/find-one ds
+                                            (readable-type->type (:queue-items/readable-type qi))
+                                            (:queue-items/readable-id qi))]
+      (let [qi (if (= "unread" (:queue-items/state qi))
+                 (or (start-reading! ds user-id queue-item-id) qi)
+                 qi)]
+        {:queue-item qi :readable readable}))))

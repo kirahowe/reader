@@ -23,9 +23,42 @@
   [jdbc-url]
   (some-> jdbc-url (str/replace #"//[^@/]+@" "//")))
 
+(def ^:private credential-url-re
+  ;; A postgres URL carrying credentials in the libpq `user:password@host`
+  ;; authority. The `jdbc:` prefix is optional; the `@` makes the match
+  ;; conditional on credentials actually being present, so credential-free
+  ;; URLs (dev's embedded Postgres) fall through untouched.
+  #"^(?:jdbc:)?postgres(?:ql)?://([^/@]+)@([^?]+)(?:\?(.*))?$")
+
+(defn- normalize-spec
+  "Reshape the datasource spec so pgjdbc accepts its `:jdbc-url`.
+
+   Neon hands you a libpq connection URI —
+   `postgresql://user:password@host/db?sslmode=require&channel_binding=require`
+   — but the PostgreSQL JDBC driver parses neither credentials in the
+   authority nor the libpq-only `channel_binding` parameter, so HikariCP
+   fails with \"Failed to get driver instance\" the first time it opens a
+   connection. Lift any embedded credentials into `:username`/`:password`,
+   strip `channel_binding`, and emit a `jdbc:postgresql://host/db` URL the
+   driver understands. A credential-free URL is returned unchanged."
+  [{:keys [jdbc-url] :as spec}]
+  (if-let [[_ userinfo host-path query]
+           (and jdbc-url (re-matches credential-url-re jdbc-url))]
+    (let [[user pass] (str/split userinfo #":" 2)
+          query'      (some->> (some-> query (str/split #"&"))
+                               (remove #(str/starts-with? % "channel_binding="))
+                               seq
+                               (str/join "&"))]
+      (assoc spec
+             :jdbc-url (cond-> (str "jdbc:postgresql://" host-path)
+                         query' (str "?" query'))
+             :username user
+             :password pass))
+    spec))
+
 (defmethod ig/init-key :reader.db/datasource [_ {:keys [spec]}]
   (log/info "datasource starting" {:jdbc-url (redact-url (:jdbc-url spec))})
-  (let [ds (connection/->pool HikariDataSource (update-keys spec kebab->camel))]
+  (let [ds (connection/->pool HikariDataSource (update-keys (normalize-spec spec) kebab->camel))]
     (log/info "datasource started" {:pool-name (:pool-name spec)})
     ds))
 

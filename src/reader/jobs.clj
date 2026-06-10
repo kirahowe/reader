@@ -91,13 +91,22 @@
   (settle! ds job {:state "done" :locked-until nil}))
 
 (defn fail!
-  "Record a failed run on the leased `job` (the row returned by
-   `claim-next!`) with `error-msg`. By default the job goes back to
-   `\"pending\"` so a later `claim-next!` will retry it; pass
-   `{:fatal? true}` for an unrecoverable error that should land in
-   `\"failed\"`. Returns nil if our lease no longer holds."
+  "Record a failed run on the leased `job` (the row returned by `claim-next!`)
+   with `error-msg`. The job lands in `\"failed\"` when the error is fatal
+   (`{:fatal? true}`) or it has exhausted `:max-attempts`; otherwise it is
+   rescheduled for a later retry with exponential backoff
+   (`:backoff-base-secs` * 2^(attempts-1)) so a flaky source isn't hammered in
+   a tight loop. Returns nil if our lease no longer holds."
   ([ds job error-msg] (fail! ds job error-msg {}))
-  ([ds job error-msg {:keys [fatal?]}]
-   (settle! ds job {:state        (if fatal? "failed" "pending")
-                    :last-error   error-msg
-                    :locked-until nil})))
+  ([ds job error-msg {:keys [fatal? max-attempts backoff-base-secs]
+                      :or   {max-attempts 5 backoff-base-secs 10}}]
+   (let [attempts (:jobs/attempts job)
+         give-up? (or fatal? (>= attempts max-attempts))
+         backoff  (long (* backoff-base-secs (Math/pow 2 (dec attempts))))]
+     (settle! ds job
+              (cond-> {:state        (if give-up? "failed" "pending")
+                       :last-error   error-msg
+                       :locked-until nil}
+                (not give-up?)
+                (assoc :run-at [:+ [:raw "now()"]
+                                [:* backoff [:raw "interval '1 second'"]]]))))))

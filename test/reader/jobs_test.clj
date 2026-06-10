@@ -94,18 +94,31 @@
   (with-system [system]
     (let [ds (:reader.db/datasource system)]
 
-      (testing "by default, transitions back to 'pending' so claim-next! can retry"
+      (testing "by default, transitions back to 'pending' but backs off the retry"
         (let [claimed (do (jobs/enqueue! ds "retries" {:n 1})
                           (jobs/claim-next! ds "retries"))
               failed  (jobs/fail! ds claimed "transient")]
-          (is (= "pending"  (:jobs/state failed)))
+          (is (= "pending"   (:jobs/state failed)))
           (is (= "transient" (:jobs/last-error failed)))
           (is (nil? (:jobs/locked-until failed)))
 
-          (testing "and claim-next! does pick it back up"
-            (let [reclaimed (jobs/claim-next! ds "retries")]
-              (is (= (:jobs/id claimed) (:jobs/id reclaimed)))
-              (is (= 2 (:jobs/attempts reclaimed)))))))
+          (testing "the retry is delayed by backoff, so claim-next! won't reclaim immediately"
+            (is (nil? (jobs/claim-next! ds "retries"))))))
+
+      (testing "with backoff disabled the retry is immediately claimable, bumping attempts"
+        (let [claimed (do (jobs/enqueue! ds "retries2" {:n 1})
+                          (jobs/claim-next! ds "retries2"))
+              _       (jobs/fail! ds claimed "transient" {:backoff-base-secs 0})
+              reclaim (jobs/claim-next! ds "retries2")]
+          (is (= (:jobs/id claimed) (:jobs/id reclaim)))
+          (is (= 2 (:jobs/attempts reclaim)))))
+
+      (testing "gives up (-> 'failed') once max-attempts is reached"
+        (let [claimed (do (jobs/enqueue! ds "giveup" {:n 1})
+                          (jobs/claim-next! ds "giveup"))      ; attempts -> 1
+              failed  (jobs/fail! ds claimed "transient" {:max-attempts 1})]
+          (is (= "failed" (:jobs/state failed)) "attempts (1) >= max-attempts (1)")
+          (is (nil? (jobs/claim-next! ds "giveup")))))
 
       (testing "with :fatal? true, transitions to 'failed' (terminal)"
         (let [claimed (do (jobs/enqueue! ds "emails" {:to "f@x.test"})

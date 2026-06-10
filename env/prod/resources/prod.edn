@@ -40,4 +40,11 @@
  {:api-url        #env "HANKO_API_URL"
   :allowed-emails #env/set "ALLOWED_EMAILS"}
 
- :reader.handlers.auth/login {:api-url #env "HANKO_API_URL"}}
+ :reader.handlers.auth/login {:api-url #env "HANKO_API_URL"}
+
+ ;; Background worker draining :extract-article jobs (manual URL ingest).
+ :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
+                      :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler}
+                      :poll-ms           1000
+                      :max-attempts      5
+                      :backoff-base-secs 10}}

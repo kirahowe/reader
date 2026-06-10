@@ -48,6 +48,22 @@
                  [:user-id :readable-type :readable-id]
                  {:state "unread" :added-at [:now]})))
 
+(defn enqueue-if-absent!
+  "Add a readable to `user-id`'s queue as unread, but only when it isn't already
+   there — an existing entry (read, archived, whatever) is left exactly as-is, so
+   an automated re-add such as an inbound-email redelivery can't resurrect an item
+   the user has already dealt with. Returns the existing or newly inserted item.
+   Contrast `enqueue!`, which deliberately brings a re-added item back to unread."
+  ([ds user-id readable-type readable-id] (enqueue-if-absent! ds user-id readable-type readable-id {}))
+  ([ds user-id readable-type readable-id via]
+   (or (crud/find-1 ds :queue-items {:user-id       user-id
+                                     :readable-type readable-type
+                                     :readable-id   readable-id})
+       (crud/create! ds :queue-items {:user-id       user-id
+                                      :readable-type readable-type
+                                      :readable-id   readable-id
+                                      :via           via}))))
+
 (defn- owned
   "`user-id`'s queue item by id, or nil when it's missing or another user's.
    The single owner-scope check the state-transition verbs share."

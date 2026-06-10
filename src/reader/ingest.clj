@@ -14,14 +14,17 @@
             [reader.articles :as articles]
             [reader.authors :as authors]
             [reader.db.crud :as crud]
+            [reader.ingest.email :as email]
             [reader.ingest.entities :as entities]
             [reader.ingest.events :as events]
             [reader.ingest.extract :as extract]
             [reader.ingest.fetch :as fetch]
             [reader.ingest.schema :as schema]
             [reader.jobs :as jobs]
+            [reader.newsletters :as newsletters]
             [reader.reading :as reading]
             [reader.slug :as slug]
+            [reader.storage :as storage]
             [reader.url :as url])
   (:import [java.time Instant]))
 
@@ -94,6 +97,29 @@
         (catch Throwable e
           (log/error e "failed to record extraction failure event" {:url url})))
       (throw t))))
+
+;; ── inbound newsletter ingest (the :ingest-email job) ────────────────────
+
+(defn ingest-email!
+  "Job handler: fetch the raw .eml stored at `r2-key`, parse it, and record the
+   newsletter issue on `user-id`'s queue in one transaction. Idempotent on the
+   Message-ID — the payload value (threaded from the webhook) preferred, the
+   parsed header as fallback. A missing object is fatal — retrying won't conjure
+   it. Payload ids arrive as strings (jsonb drops uuid types), so `:user-id` is
+   parsed."
+  [ds store {:keys [user-id r2-key message-id]}]
+  (let [raw (storage/get-object store r2-key)]
+    (when-not raw
+      (throw (ex-info "no stored object for r2-key"
+                      {:r2-key r2-key :error-class :missing-object :fatal? true})))
+    (let [parsed (email/parse raw)
+          mid    (or (not-empty (str message-id)) (:message-id parsed))]
+      (jdbc/with-transaction [tx ds]
+        (newsletters/record-issue! tx (parse-uuid (str user-id))
+                                   (assoc parsed :message-id mid :raw-key r2-key))))))
+
+(defmethod ig/init-key :reader.ingest/ingest-email-handler [_ {store :storage}]
+  (fn [ds payload] (ingest-email! ds store payload)))
 
 (defmethod ig/init-key :reader.ingest/entity-extractor [_ _]
   ;; The default entity-extraction seam. Swap this key's value for an

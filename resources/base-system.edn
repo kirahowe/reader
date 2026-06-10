@@ -62,6 +62,9 @@
  ;; thread races the job tests).
  :reader.ingest/entity-extractor {}
  :reader.ingest/extract-article-handler {:extract-entities #ig/ref :reader.ingest/entity-extractor}
+ ;; :ingest-email job handler. `storage` is supplied per-environment (the R2
+ ;; client in prod, the in-memory stub in dev/test) where that component exists.
+ :reader.ingest/ingest-email-handler {}
 
  ;; Auth. jwks-url, issuer, api-url, allowed-emails, and the CSRF site-origin
  ;; are environment-specific and supplied by the dev/test/prod profiles.

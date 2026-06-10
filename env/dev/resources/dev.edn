@@ -18,9 +18,14 @@
 
  :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}
 
- ;; Background worker draining :extract-article jobs (manual URL ingest).
+ ;; The :ingest-email handler reads the raw .eml from blob storage (the
+ ;; in-memory stub in dev — a REPL can seed it to exercise the path locally).
+ :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
+
+ ;; Background worker draining the ingest jobs (manual URL + inbound email).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
-                      :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler}
+                      :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler
+                                          "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler}
                       :poll-ms           1000
                       :max-attempts      5
                       :backoff-base-secs 10}

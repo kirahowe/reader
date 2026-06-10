@@ -5,6 +5,7 @@
    assert the real fields (title/byline/source/links) precisely and just check
    the placeholder body surfaces the right text."
   (:require [clojure.test :refer [deftest is testing]]
+            [hiccup2.core :as h]
             [reader.extract :as extract]))
 
 (defn- body-text
@@ -30,6 +31,19 @@
     (testing "the placeholder body previews the abstract and marks itself a stub"
       (is (re-find #"A note\." (body-text (:body out))))
       (is (re-find #"(?i)not available in the reader" (body-text (:body out)))))))
+
+(deftest extract-article-renders-stored-body-test
+  (testing "once extracted, the sanitized body_html is rendered raw and wins over the abstract"
+    (let [out  (extract/extract
+                {:item {:type :article :title "Real" :source nil :authors []}
+                 :row  {:articles/body-html     "<p>The actual extracted body of the piece.</p>"
+                        :articles/abstract       "an abstract that should be ignored now"
+                        :articles/canonical-url  "https://x.test/real"}})
+          rendered (str (h/html (:body out)))]
+      (is (re-find #"The actual extracted body" rendered))
+      (is (re-find #"<p>" rendered) "stored markup is rendered, not escaped")
+      (is (not (re-find #"(?i)not available in the reader" rendered)) "no placeholder when a body exists")
+      (is (not (re-find #"abstract that should be ignored" rendered))))))
 
 (deftest extract-paper-test
   (let [out (extract/extract

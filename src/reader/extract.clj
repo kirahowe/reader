@@ -4,13 +4,14 @@
    {:title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.
 
-   Real per-type body rendering is deferred and looks different per type:
-   articles/papers still need fetching and parsing, while a newsletter issue's
-   full content is already stored and only needs sanitization. For now each
-   method returns a *placeholder* body while populating the real fields
-   (title/byline/source/date/links) from what we already store. Because the
-   placeholder is plain escaped text, there is no raw-HTML/XSS surface yet;
-   sanitization rides with the real body rendering.")
+   Article bodies render the stored reader-view HTML produced by ingest
+   (reader.ingest.extract), which sanitizes with jsoup at the fetch boundary —
+   so the stored body_html is trusted and rendered raw here. Until an article
+   has been extracted (body_html is still null), and for papers and newsletter
+   issues, the body is a *placeholder* while the real fields (title / byline /
+   source / date / links) come from what we already store. Paper PDF rendering
+   and newsletter HTML sanitization land with their own ingest paths."
+  (:require [hiccup.util :as hu]))
 
 (defn- placeholder-body
   "Stand-in for a not-yet-rendered body. Shows `preview` (an abstract) when we
@@ -22,6 +23,15 @@
   [:div.prose
    (when preview [:p.lead preview])
    [:p.muted.placeholder "The full text is not available in the reader yet."]])
+
+(defn- article-body
+  "An article's stored reader-view body when we have one — sanitized at ingest
+   (reader.ingest.extract, jsoup Safelist), so the stored HTML is trusted and
+   rendered raw — otherwise the placeholder previewing the abstract."
+  [row]
+  (if-let [html (not-empty (:articles/body-html row))]
+    [:div.prose (hu/raw-string html)]
+    (placeholder-body (:articles/abstract row))))
 
 (defn- common
   "The type-independent fields, taken straight from the normalized item."
@@ -38,7 +48,7 @@
 (defmethod extract :article [{:keys [row] :as readable}]
   (assoc (common readable)
          :date  (:articles/published-at row)
-         :body  (placeholder-body (:articles/abstract row))
+         :body  (article-body row)
          :links [{:label "View original" :href (:articles/canonical-url row)}]))
 
 (defmethod extract :paper [{:keys [row] :as readable}]

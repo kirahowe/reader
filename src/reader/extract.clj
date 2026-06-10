@@ -4,21 +4,20 @@
    {:title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.
 
-   Article bodies render the stored reader-view HTML produced by ingest
-   (reader.ingest.extract), which sanitizes with jsoup at the fetch boundary —
+   Article and newsletter-issue bodies render the stored HTML produced by
+   ingest, which sanitizes with jsoup at the ingest boundary
+   (reader.ingest.extract for articles, reader.ingest.email for newsletters) —
    so the stored body_html is trusted and rendered raw here. Until an article
-   has been extracted (body_html is still null), and for papers and newsletter
-   issues, the body is a *placeholder* while the real fields (title / byline /
-   source / date / links) come from what we already store. Paper PDF rendering
-   and newsletter HTML sanitization land with their own ingest paths."
+   has been extracted (body_html is still null), and for papers, the body is a
+   *placeholder* while the real fields (title / byline / source / date / links)
+   come from what we already store. Paper PDF rendering lands with its own
+   ingest path."
   (:require [hiccup.util :as hu]))
 
 (defn- placeholder-body
   "Stand-in for a not-yet-rendered body. Shows `preview` (an abstract) when we
-   have one, then a notice marking the full text as pending. What's pending
-   varies by type: fetching/parsing for articles and papers, sanitization for
-   stored newsletter HTML. TODO: real per-type rendering replaces this in the
-   `extract` methods below."
+   have one, then a notice marking the full text as pending — an article still
+   being fetched/parsed, or a paper whose in-reader PDF viewer isn't built yet."
   [preview]
   [:div.prose
    (when preview [:p.lead preview])
@@ -32,6 +31,15 @@
   (if-let [html (not-empty (:articles/body-html row))]
     [:div.prose (hu/raw-string html)]
     (placeholder-body (:articles/abstract row))))
+
+(defn- newsletter-body
+  "A newsletter issue's stored body — sanitized at ingest (reader.ingest.email,
+   jsoup Safelist), so the stored HTML is trusted and rendered raw — otherwise a
+   placeholder (an issue with an empty body is unusual but renders cleanly)."
+  [row]
+  (if-let [html (not-empty (:newsletter-issues/body-html row))]
+    [:div.prose (hu/raw-string html)]
+    (placeholder-body nil)))
 
 (defn- common
   "The type-independent fields, taken straight from the normalized item."
@@ -64,5 +72,5 @@
 (defmethod extract :newsletter-issue [{:keys [row] :as readable}]
   (assoc (common readable)
          :date  (:newsletter-issues/sent-at row)
-         :body  (placeholder-body nil)
+         :body  (newsletter-body row)
          :links []))

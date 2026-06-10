@@ -66,12 +66,23 @@
                         :row  {:papers/abstract nil :papers/doi nil :papers/arxiv-id nil}}))))))
 
 (deftest extract-newsletter-test
-  (let [out (extract/extract
-             {:item {:type :newsletter-issue :title "ACT links for the week"
-                     :source {:name "ACT" :slug "act"} :authors []}
-              :row  {:newsletter-issues/sent-at   nil
-                     :newsletter-issues/body-html "<h1>hi</h1>"}})]
-    (testing "a newsletter issue has no external links and a placeholder body"
+  (let [out      (extract/extract
+                  {:item {:type :newsletter-issue :title "ACT links for the week"
+                          :source {:name "ACT" :slug "act"} :authors []}
+                   :row  {:newsletter-issues/sent-at   nil
+                          :newsletter-issues/body-html "<h1>This week's links</h1><p>Body.</p>"}})
+        rendered (str (h/html (:body out)))]
+    (testing "a newsletter issue has no external links"
       (is (= "ACT links for the week" (:title out)))
-      (is (= [] (:links out)))
+      (is (= [] (:links out))))
+    (testing "its stored (ingest-sanitized) body is rendered raw, not a placeholder"
+      (is (re-find #"This week's links" rendered))
+      (is (re-find #"<h1>" rendered) "stored markup is rendered, not escaped")
+      (is (not (re-find #"(?i)not available in the reader" rendered))))))
+
+(deftest extract-newsletter-without-body-test
+  (testing "a newsletter issue with no body falls back to the placeholder"
+    (let [out (extract/extract
+               {:item {:type :newsletter-issue :title "Empty" :source nil :authors []}
+                :row  {:newsletter-issues/sent-at nil :newsletter-issues/body-html ""}})]
       (is (re-find #"(?i)not available in the reader" (body-text (:body out)))))))

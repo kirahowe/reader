@@ -255,10 +255,12 @@
             (is (re-find #"doi\.org/10\.48550" body) "a DOI link")
             (is (re-find #"arxiv\.org/abs/1706\.03762" body) "an arXiv link")))
 
-        (testing "GET /queue/:id renders a newsletter reader view"
+        (testing "GET /queue/:id renders a newsletter reader view with its stored body"
           (let [{:keys [status body]} (GET (str "/queue/" qn))]
             (is (= 200 status))
-            (is (re-find #"ACT links for the week" body))))
+            (is (re-find #"ACT links for the week" body) "the subject shows")
+            (is (re-find #"This week" body) "the sanitized newsletter body renders")
+            (is (not (re-find #"(?i)not available in the reader" body)) "not the placeholder")))
 
         (testing "POST /queue/:id/read marks it read and stays on the reader view"
           (let [{:keys [status headers]} (POST (str "/queue/" qa "/read"))]

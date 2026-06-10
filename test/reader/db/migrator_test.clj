@@ -28,8 +28,11 @@
   (with-system [system]
     (let [ds     (:reader.db/datasource system)
           config (#'migrator/migratus-config ds "migrations")]
-      (testing "rolling back the init migration drops every v1 table"
-        (migratus/rollback config)
+      (testing "rolling back every migration drops the v1 schema"
+        ;; Roll back all applied migrations (not just the last) so this stays
+        ;; correct as migrations accrue beyond the init one.
+        (dotimes [_ (count (migratus/completed-list config))]
+          (migratus/rollback config))
         (let [remaining (set/intersection v1-tables (public-tables ds))]
           (is (empty? remaining)
               (str "tables still present after rollback: " remaining)))))))

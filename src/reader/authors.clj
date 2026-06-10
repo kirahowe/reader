@@ -6,7 +6,8 @@
   (:require [clojure.string :as str]
             [honey.sql :as sql]
             [next.jdbc :as jdbc]
-            [reader.db.crud :as crud]))
+            [reader.db.crud :as crud]
+            [reader.slug :as slug]))
 
 ;; Tokens that make a two-word name *not* a plain "First Last": a leading
 ;; article ("The Atlantic"), a name particle ("Van Halen", "de Beauvoir"),
@@ -50,6 +51,21 @@
                 (cond-> attrs
                   (not (contains? attrs :sort-name))
                   (assoc :sort-name (derive-sort-name (:name attrs))))))
+
+(defn find-or-create!
+  "Find an author by the slug derived from `name`, or create one (deriving a
+   sort-name and storing the optional homepage `url`). Idempotent and race-safe
+   via upsert — usable inside a larger ingest transaction, where a plain insert
+   + catch would abort the tx on conflict. Conservative: two people sharing a
+   name collapse to one row; the user can split them later. An existing author
+   keeps its stored url; the url is set only on first insert."
+  ([ds name] (find-or-create! ds name nil))
+  ([ds name url]
+   (crud/upsert! ds :authors
+                 (cond-> {:name name :slug (slug/slugify name) :sort-name (derive-sort-name name)}
+                   url (assoc :url url))
+                 [:slug]
+                 {:updated-at [:now]})))
 
 (defn list-sorted
   "All authors ordered by collation key, falling back to the display name

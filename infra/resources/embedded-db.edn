@@ -1,7 +1,8 @@
-;; Database wiring for any environment that runs Reader against an
-;; embedded Postgres (dev, tests, …). A profile that wants a different
-;; backend (a Neon branch, a hosted prod db) skips this fragment and
-;; supplies its own :reader.db/datasource :spec.
+;; Local stand-ins for the managed cloud services, for any environment
+;; that runs Reader without them (dev, tests, …): an embedded Postgres in
+;; place of Neon, and an in-memory blob store in place of Cloudflare R2. A
+;; profile that wants the real backends (prod) skips this fragment and
+;; supplies its own :reader.db/datasource :spec and :reader.storage/store.
 ;;
 ;; Convention: consumers that need the database at startup should
 ;; `#ig/ref :reader.db/migrator` rather than `:reader.db/datasource`.
@@ -16,4 +17,8 @@
 
  :reader.db/migrator
  {:datasource      #ig/ref :reader.db/datasource
-  :migrations-path "migrations"}}
+  :migrations-path "migrations"}
+
+ ;; In-memory blob store standing in for R2. The real :r2 backend + prod
+ ;; wiring land with the inbound-email worker (it needs a real bucket).
+ :reader.storage/store {:backend :memory}}

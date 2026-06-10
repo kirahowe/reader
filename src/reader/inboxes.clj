@@ -34,3 +34,9 @@
   (or (for-user ds user-id)
       (crud/create! ds :email-inboxes {:user-id user-id
                                        :alias   (str (gen-token) "@" domain)})))
+
+(defn by-alias
+  "The inbox row for a full recipient `address`, or nil — how the inbound webhook
+   resolves an incoming recipient to its owning user. `alias` is unique."
+  [ds address]
+  (when address (crud/find-1 ds :email-inboxes {:alias address})))

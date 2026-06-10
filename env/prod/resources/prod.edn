@@ -47,4 +47,8 @@
                       :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler}
                       :poll-ms           1000
                       :max-attempts      5
-                      :backoff-base-secs 10}}
+                      :backoff-base-secs 10}
+
+ ;; Eval dashboard admins — empty by default (so the route 404s for everyone);
+ ;; set the comma-separated ADMIN_EMAILS Fly secret to grant access, no redeploy.
+ :reader.handlers.admin/extractions {:admin-emails #env/set "ADMIN_EMAILS"}}

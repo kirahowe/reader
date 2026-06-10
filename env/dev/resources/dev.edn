@@ -23,4 +23,7 @@
                       :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler}
                       :poll-ms           1000
                       :max-attempts      5
-                      :backoff-base-secs 10}}
+                      :backoff-base-secs 10}
+
+ ;; The seeded test user can see the eval dashboard in dev.
+ :reader.handlers.admin/extractions {:admin-emails #{"test@example.com"}}}

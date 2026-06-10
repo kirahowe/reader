@@ -19,6 +19,7 @@
    ["/queue/:id/archive"   {:post {:handler #ig/ref :reader.handlers.queue/archive}}]
    ["/queue/:id/read"      {:post {:handler #ig/ref :reader.handlers.queue/mark-read}}]
    ["/queue/:id/unread"    {:post {:handler #ig/ref :reader.handlers.queue/mark-unread}}]
+   ["/admin/extractions"   {:get  {:handler #ig/ref :reader.handlers.admin/extractions}}]
    ["/health"              {:public? true :get {:handler #ig/ref :reader.handlers/health}}]
    ["/static/*"            {:public? true :handler #ig/ref :reader.handlers/static}]]}
 
@@ -40,6 +41,9 @@
  :reader.handlers.queue/archive      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-read    {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-unread  {:datasource #ig/ref :reader.db/migrator}
+ ;; Eval dashboard, admin-gated. admin-emails defaults to none; the dev profile
+ ;; admits the seeded user, and prod can override with #env/set "ADMIN_EMAILS".
+ :reader.handlers.admin/extractions  {:datasource #ig/ref :reader.db/migrator :admin-emails #{}}
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 

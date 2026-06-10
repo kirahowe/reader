@@ -219,3 +219,26 @@ button:hover { border-color: var(--fg); }
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Extraction eval dashboard */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+.stats dt { font-size: 0.8125rem; color: var(--muted); }
+.stats dd { margin: 0; font-family: var(--font-prose); font-size: 1.5rem; }
+
+table.eval { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+table.eval th, table.eval td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 400;
+}
+table.eval thead th { color: var(--muted); }
+.sources { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.sources .source { font-size: 0.8125rem; color: var(--muted); }
+
+main section + section { margin-top: var(--space-5); }

@@ -17,7 +17,9 @@
         org.postgresql/postgresql          {:mvn/version "42.7.7"}
         migratus/migratus                  {:mvn/version "1.6.6"}
         com.github.sikt-no/clj-jwt         {:mvn/version "0.5.109"}
-        com.cnuernber/charred             {:mvn/version "1.038"}}
+        com.cnuernber/charred             {:mvn/version "1.038"}
+        org.jsoup/jsoup                    {:mvn/version "1.21.1"}
+        net.dankito.readability4j/readability4j {:mvn/version "1.0.8"}}
 
  :aliases
  {:dev    {:extra-paths ["env/dev/src" "env/dev/resources" "infra/src" "infra/resources"]

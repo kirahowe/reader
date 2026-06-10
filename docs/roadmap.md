@@ -101,10 +101,10 @@ fill the `CHANGEME` URLs in `dev.edn` (and the prod secrets).
 
 ---
 
-## Step 4 — Reading queue (read side) 🚧
+## Step 4 — Reading queue (read side) ✅
 
-Users can see what's in their queue, archive items, and add an article
-by URL. Opening an item (the reader view) is the remaining slice.
+Users can see what's in their queue, open and read items, mark them
+read/unread, and archive them.
 
 **Reality check vs. the original sketch**
 - The queue renders on `GET /` — the home page *is* the reading list —
@@ -138,58 +138,79 @@ by URL. Opening an item (the reader view) is the remaining slice.
   re-add / cross-user isolation), and the pure catalog assembly. Seed
   now provisions two users whose queues overlap on shared readables.
 
-**Still pending**
-- `GET /readable/:id` (dispatched by type) + `reader.ui.pages.reader` —
-  render an article body, a paper's PDF link (R2 viewer comes later),
-  and a newsletter issue's HTML body.
-- `POST /queue/:id/mark-read` plus the HTMX in-place swap for state
-  changes — no full page reload to mark something read.
+**Delivered (since)**
+- `GET /queue/:id` (dispatched by readable type) + `reader.ui.pages.reader`
+  — renders an article/newsletter body and a paper's external links.
+  First open promotes the item to `reading` and stamps `started_at`.
+- `POST /queue/:id/read` and `/unread` for state changes, owner-scoped.
 
 ---
 
-## Step 5 — Manual ingest
+## Step 5 — Manual ingest ✅
 
-Users add an article by pasting a URL.
+Users add an article by pasting a URL; it's fetched, extracted, and
+queued asynchronously.
 
-**Components**
-- `POST /readables` — accepts a URL, enqueues an `:extract-article` job
-- `reader.jobs.extract-article` — fetches the URL, extracts a
-  reader-view body (Crux / Trafilatura / readability-clj), guesses the
-  author and affiliation, writes the row
-- Worker (Integrant-managed core.async loop) draining
-  `jobs WHERE state = 'pending'` via `FOR UPDATE SKIP LOCKED`.
-
-**Done when**
-- Pasting a URL produces an `articles` row, an `authorships` row, and
-  a `queue_items` row, asynchronously, with the extracted body visible
-  in the reader view.
-- The job table reflects success/failure with attempts, last error,
-  and locked_until accounted for.
+**Delivered**
+- `POST /readables` — upserts a placeholder article keyed on
+  (canonical url, fetched-on), enqueues it on the queue, and enqueues an
+  `:extract-article` job; an HTMX row polls `/queue/:id/row` until done.
+- `reader.ingest` + `reader.ingest.{fetch,extract,entities,events}` —
+  jsoup + Readability4J body extraction, with a swappable entity seam
+  (deterministic metadata extractor now, LLM-backed later) behind the
+  EntityResult contract.
+- `reader.jobs.worker` — Integrant-owned core.async loop draining the
+  jobs table via `claim-next!` (`FOR UPDATE SKIP LOCKED`), with
+  exponential-backoff retries and a `failed` terminal state.
+- `/admin/extractions` — an eval dashboard over `extraction_events`
+  (coverage, latency, errors, recovery) — the instrument that tells us
+  when to turn on the LLM entity tier.
 
 ---
 
-## Step 6 — Inbound email
+## Step 6 — Inbound email 🚧
 
 Newsletters arrive by email and end up in the queue automatically.
 
-**Components**
-- A Cloudflare Worker (separate small repo or `worker/` subdir): runs
-  inside Email Routing, writes the raw `.eml` to R2, signs and POSTs
-  `{alias, r2-key, from, subject}` to `/api/inbound`.
-- `:reader.storage/r2` — S3-SDK client (already needed by step 5 if
-  PDFs are involved earlier, but lands here at the latest).
-- `POST /api/inbound` — signature verification, Malli-validated body,
-  enqueues `:ingest-email`.
-- `reader.jobs.ingest-email` — fetches the `.eml` from R2, parses
-  it, finds or creates the affiliation (matching by `newsletter_sources.inbound_email_alias`),
-  finds or creates the author, writes a `newsletter_issues` row plus
-  `authorships` plus `queue_items`.
+**Design (decided).** Cloudflare Email Routing → a thin Email Worker that
+PUTs the raw `.eml` to R2 (native binding) and POSTs signed metadata to the
+app → an `:ingest-email` job that parses and files it. Chosen over an
+inbound-parse provider (SendGrid/Mailgun/SES) because the Cloudflare path is
+flat-cost — Email Routing free, R2 zero-egress, Workers a free tier — rather
+than per-email metered, and the raw mail stays in our own R2. The Worker is
+the integration point because Email Routing's only programmatic hook is a
+Worker (it can otherwise only forward to an address); the app can't be the MX
+itself (ADR 0004).
+
+**Server side — delivered (Slices 0–4, behind a stubbed R2 + simulated
+worker, no domain needed):**
+- `reader.storage` — a `Blobs` seam (`:reader.storage/store`), in-memory
+  stub in dev/test, R2 in prod. Mirrors embedded-postgres-for-Neon.
+- Per-user `email_inboxes` alias (`r-<token>@<domain>`), provisioned
+  idempotently and surfaced on `/settings`.
+- `POST /api/inbound` — public but HMAC-signed (`reader.web.signature`):
+  constant-time verify over `timestamp + body`, 5-minute replay window,
+  Malli-validated payload, resolves the alias to a user, enqueues
+  `:ingest-email`. Fails closed when the shared secret is unset.
+- `reader.ingest/ingest-email!` + `reader.ingest.email` +
+  `reader.newsletters` — fetch the `.eml`, parse it (Jakarta Mail:
+  subject, sender, sent-at, Message-ID, jsoup-sanitized body), resolve or
+  create the newsletter source by sender domain and the author from the
+  From line, write `newsletter_issues` + `authorships` + `queue_items` in
+  one transaction. Idempotent on Message-ID.
+- The reader view renders the sanitized newsletter body.
+
+**Still pending — Slice 5 (needs external setup):**
+- `worker/` — the Email Worker + `wrangler.toml`.
+- The real `:r2` storage backend + prod profile wiring.
+- A registered domain on Cloudflare, MX records, an Email Routing rule,
+  and the `INBOUND_HMAC_SECRET` / R2 / domain secrets.
 
 **Done when**
 - Sending a real email to an alias results in a newsletter issue
   appearing in the user's queue within a few seconds.
-- The signature check rejects unsigned and replay-attempted requests.
-- Unknown senders create the right affiliation as a side effect.
+- The signature check rejects unsigned and replay-attempted requests. ✅
+- Unknown senders create the right affiliation as a side effect. ✅
 
 ---
 

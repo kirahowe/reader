@@ -13,4 +13,6 @@
  {:jwks-url       #resource "test-jwks.json"
   :allowed-emails #{"allowed@x.test"}}
 
- :reader.handlers.auth/login {:api-url "https://test.invalid"}}
+ :reader.handlers.auth/login {:api-url "https://test.invalid"}
+
+ :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}}

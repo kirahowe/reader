@@ -242,3 +242,16 @@ table.eval thead th { color: var(--muted); }
 .sources .source { font-size: 0.8125rem; color: var(--muted); }
 
 main section + section { margin-top: var(--space-5); }
+
+/* Settings — the inbound newsletter alias. user-select:all lets one click
+   select the whole address, so it's easy to copy without any JS. */
+.inbox-alias { margin: var(--space-3) 0; }
+.inbox-alias code {
+  display: inline-block;
+  font-size: 1.0625rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  user-select: all;
+}
+.inbox-pending { font-size: 0.875rem; }

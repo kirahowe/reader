@@ -65,6 +65,7 @@
      [:a {:href "/articles/new"} "Add manually"] " · "
      [:a {:href "/authors"} "All authors"] " · "
      [:a {:href "/affiliations"} "All sources"] " · "
+     [:a {:href "/settings"} "Settings"] " · "
      [:form.logout {:method "post" :action "/logout"}
       [:button {:type "submit"} "Sign out"]]]
     [:form.add-url {:method  "post" :action "/readables"

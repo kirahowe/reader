@@ -26,4 +26,8 @@
                       :backoff-base-secs 10}
 
  ;; The seeded test user can see the eval dashboard in dev.
- :reader.handlers.admin/extractions {:admin-emails #{"test@example.com"}}}
+ :reader.handlers.admin/extractions {:admin-emails #{"test@example.com"}}
+
+ ;; Placeholder inbound-email domain for dev — no mail is actually received
+ ;; until the Cloudflare worker + a real domain land (Slice 5).
+ :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}}

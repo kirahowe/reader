@@ -5,18 +5,8 @@
   (:require [clojure.string :as str]
             [malli.core :as m]
             [malli.error :as me]
-            [reader.db.crud :as crud]))
-
-(defn slugify
-  "A URL slug from a title: lowercased, non-alphanumeric runs collapsed to a
-   single hyphen, hyphens trimmed from the ends. Not unique by design —
-   `articles.slug` carries no uniqueness constraint (only `canonical_url`
-   does)."
-  [s]
-  (-> (or s "")
-      str/lower-case
-      (str/replace #"[^a-z0-9]+" "-")
-      (str/replace #"^-+|-+$" "")))
+            [reader.db.crud :as crud]
+            [reader.slug :as slug]))
 
 (defn- blank->nil [s]
   (when-not (str/blank? s) (str/trim s)))
@@ -66,7 +56,7 @@
       (try
         {:article (crud/create! ds :articles
                                 (-> attrs
-                                    (assoc :slug (slugify (:title attrs)))
+                                    (assoc :slug (slug/slugify (:title attrs)))
                                     (cond-> (:affiliation-id attrs)
                                       (update :affiliation-id parse-uuid))))}
         (catch java.sql.SQLException e
@@ -74,3 +64,24 @@
             "23505" {:errors {:canonical-url ["An article with that URL already exists."]}}
             "23503" {:errors {:affiliation-id ["Unknown source."]}}
             (throw e)))))))
+
+(defn ingest-attrs
+  "Pure: the article column map to finalize a placeholder from an extraction
+   context (reader.ingest.extract) plus a resolved affiliation id (nil ok).
+   `now` (an Instant) is injected for `updated-at` — a HoneySQL [:now] would be
+   jsonb-encoded by crud/update! (see reader.db.crud / reader.reading). Title
+   falls back to the url so the NOT NULL column is always satisfied."
+  [extract affiliation-id now]
+  (let [f     (:fields extract)
+        b     (:body extract)
+        v     (fn [k] (get-in f [k :value]))
+        title (or (v :title) (:url extract))]
+    (cond-> {:title             title
+             :slug              (slug/slugify title)
+             :body-html         (:html b)
+             :word-count        (:word-count b)
+             :reading-time-secs (:reading-time-secs b)
+             :updated-at        now}
+      affiliation-id    (assoc :affiliation-id affiliation-id)
+      (v :lang)         (assoc :lang (v :lang))
+      (v :published-at) (assoc :published-at (v :published-at)))))

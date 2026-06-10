@@ -39,6 +39,14 @@
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 
+ ;; Ingest. `entity-extractor` is the swappable entity seam — the deterministic
+ ;; metadata reader now, an LLM-backed extractor later behind the same
+ ;; EntityResult contract. The worker that drains :extract-article jobs is wired
+ ;; in the dev/prod profiles (kept out of the test profile so no background
+ ;; thread races the job tests).
+ :reader.ingest/entity-extractor {}
+ :reader.ingest/extract-article-handler {:extract-entities #ig/ref :reader.ingest/entity-extractor}
+
  ;; Auth. jwks-url, issuer, api-url, allowed-emails, and the CSRF site-origin
  ;; are environment-specific and supplied by the dev/test/prod profiles.
  ;; allowed-emails gates *provisioning* only: an unseen identity is admitted

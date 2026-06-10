@@ -180,3 +180,42 @@ button:hover { border-color: var(--fg); }
   padding-top: var(--space-4);
   border-top: 1px solid var(--rule);
 }
+
+/* URL ingest: the add-by-URL form and the import placeholder rows. */
+.add-url { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); }
+.add-url input[type="url"] {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--bg);
+  color: inherit;
+}
+.add-url input:focus { border-color: var(--accent); }
+.add-url input:focus:not(:focus-visible) { outline: none; }
+.add-url button[type="submit"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+.add-url button[type="submit"]:hover { filter: brightness(1.08); border-color: var(--accent); }
+
+/* An importing row is dimmed while it polls; a failed one flags itself in the
+   accent colour — the same cue the forms use for errors. */
+.readable.importing { opacity: 0.65; }
+.readable.failed .readable-title { color: var(--accent); }
+.import-url { overflow-wrap: anywhere; }
+
+.spinner {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.1em;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

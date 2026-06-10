@@ -23,13 +23,37 @@
            :stroke "currentColor" :stroke-width "2"
            :stroke-linecap "round" :stroke-linejoin "round"}]])
 
-(defn- item [{:keys [queue-item-id title] :as readable}]
-  [:li.readable
+(defn item [{:keys [queue-item-id title] :as readable}]
+  [:li.readable {:id (str "q-" queue-item-id)}
    [:div.readable-text
     [:div.readable-title [:a {:href (str "/queue/" queue-item-id)} title]]
     (meta-line readable)]
    [:form.readable-actions {:method "post"
                             :action (str "/queue/" queue-item-id "/archive")}
+    [:button {:type "submit" :aria-label "Archive"} trash-icon]]])
+
+(defn importing-row
+  "A placeholder queue row for an article still being fetched/extracted. It
+   polls its own /queue/:id/row endpoint and replaces itself (outerHTML) once
+   the status changes to done or failed."
+  [queue-item-id url]
+  [:li.readable.importing {:id         (str "q-" queue-item-id)
+                           :hx-get     (str "/queue/" queue-item-id "/row")
+                           :hx-trigger "load delay:1.5s, every 2s"
+                           :hx-swap    "outerHTML"}
+   [:div.readable-text
+    [:div.readable-title [:span.spinner {:aria-hidden "true"}] " Importing…"]
+    [:div.readable-meta.muted [:span.import-url url]]]])
+
+(defn failed-row
+  "A queue row for an article whose import permanently failed; offers the manual
+   add form as a fallback. No polling — this is terminal."
+  [queue-item-id url]
+  [:li.readable.failed {:id (str "q-" queue-item-id)}
+   [:div.readable-text
+    [:div.readable-title "Couldn’t import"]
+    [:div.readable-meta.muted [:span.import-url url] " · " [:a {:href "/articles/new"} "add manually"]]]
+   [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
     [:button {:type "submit" :aria-label "Archive"} trash-icon]]])
 
 (defn render [readables]
@@ -38,11 +62,17 @@
    [:main
     [:h1 "Your reading list"]
     [:nav.index-nav.muted
-     [:a {:href "/articles/new"} "Add article"] " · "
+     [:a {:href "/articles/new"} "Add manually"] " · "
      [:a {:href "/authors"} "All authors"] " · "
      [:a {:href "/affiliations"} "All sources"] " · "
      [:form.logout {:method "post" :action "/logout"}
       [:button {:type "submit"} "Sign out"]]]
-    (if (seq readables)
-      (into [:ul.readables] (map item readables))
-      [:p.muted "Nothing here yet."])]))
+    [:form.add-url {:method  "post" :action "/readables"
+                    :hx-post "/readables" :hx-target "#readables-list" :hx-swap "afterbegin"}
+     [:input {:type "url" :name "url" :placeholder "Paste an article URL…"
+              :required true :autocomplete "off"}]
+     [:button {:type "submit"} "Add"]]
+    ;; Always render the list (even empty) so the HTMX afterbegin target exists.
+    [:ul.readables {:id "readables-list"} (map item readables)]
+    (when-not (seq readables)
+      [:p.muted "Nothing here yet — paste a URL above to add your first article."])]))

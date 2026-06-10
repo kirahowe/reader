@@ -56,6 +56,19 @@
     (when (= user-id (:queue-items/user-id item))
       item)))
 
+(defn queue-item
+  "The single normalized queue entry for `user-id`'s `queue-item-id`, read-only
+   (no state change), or nil when missing, not theirs, or the readable is gone.
+   Used by the ingest poll to re-render one row."
+  [ds user-id queue-item-id]
+  (when-let [qi (owned ds user-id queue-item-id)]
+    (let [type (readable-type->type (:queue-items/readable-type qi))]
+      (when-let [item (first (readables/catalog-of ds [[type (:queue-items/readable-id qi)]]))]
+        (assoc item
+               :queue-item-id (:queue-items/id qi)
+               :state         (:queue-items/state qi)
+               :added-at      (:queue-items/added-at qi))))))
+
 (defn- start-reading!
   "On first open, move `user-id`'s still-`unread` queue item to `reading` and stamp
    `started-at`. Atomic and owner-scoped via the WHERE; returns the updated row, or

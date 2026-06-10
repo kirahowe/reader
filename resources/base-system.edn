@@ -13,7 +13,9 @@
    ["/affiliations"        {:get  {:handler #ig/ref :reader.handlers.affiliations/index}}]
    ["/articles/new"        {:get  {:handler #ig/ref :reader.handlers.articles/new}}]
    ["/articles"            {:post {:handler #ig/ref :reader.handlers.articles/create}}]
+   ["/readables"           {:post {:handler #ig/ref :reader.handlers.readables/create}}]
    ["/queue/:id"           {:get  {:handler #ig/ref :reader.handlers.reader/show}}]
+   ["/queue/:id/row"       {:get  {:handler #ig/ref :reader.handlers.readables/row}}]
    ["/queue/:id/archive"   {:post {:handler #ig/ref :reader.handlers.queue/archive}}]
    ["/queue/:id/read"      {:post {:handler #ig/ref :reader.handlers.queue/mark-read}}]
    ["/queue/:id/unread"    {:post {:handler #ig/ref :reader.handlers.queue/mark-unread}}]
@@ -33,6 +35,8 @@
  :reader.handlers.articles/new       {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.articles/create    {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.reader/show        {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.readables/create   {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.readables/row      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/archive      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-read    {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-unread  {:datasource #ig/ref :reader.db/migrator}

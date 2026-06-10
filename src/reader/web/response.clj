@@ -1,7 +1,8 @@
 (ns reader.web.response
   "Small ring-response helpers shared across handlers, so the handlers stay
    glue: read input, call the domain, pick a response."
-  (:require [reader.ui.layout :as layout]))
+  (:require [hiccup2.core :as h]
+            [reader.ui.layout :as layout]))
 
 (defn html
   "An HTML response. Status defaults to 200."
@@ -10,6 +11,12 @@
    {:status  status
     :headers {"content-type" "text/html; charset=utf-8"}
     :body    body}))
+
+(defn fragment
+  "An HTML response whose body is a rendered hiccup fragment (no page chrome) —
+   for HTMX partial swaps."
+  [hiccup]
+  (html (str (h/html hiccup))))
 
 (defn see-other
   "A 303 redirect (POST -> GET, the form post/redirect/get pattern)."

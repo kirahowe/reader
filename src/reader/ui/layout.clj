@@ -15,7 +15,8 @@
           [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
           [:title title]
           [:link {:rel "stylesheet" :href "/static/css/tokens.css"}]
-          [:link {:rel "stylesheet" :href "/static/css/main.css"}]]
+          [:link {:rel "stylesheet" :href "/static/css/main.css"}]
+          [:script {:src "/static/js/htmx.min.js" :defer true}]]
          [:body body]])))
 
 (defn not-found

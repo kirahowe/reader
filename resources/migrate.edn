@@ -1,0 +1,3 @@
+;; Override layered by `reader.migrate` to enable the on-boot migrate.
+;; Gate-only, so it composes over any profile that supplies the datasource.
+{:reader.db/migrator {:migrate-on-init? true}}

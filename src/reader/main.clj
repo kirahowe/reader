@@ -40,6 +40,14 @@
 
 (def core-profiles [(io/resource "base-system.edn")])
 
+(defn profiles-from-args
+  "Builds the profile list for a `-main` invocation: `core-profiles`,
+  plus an extra profile resource named by the first CLI arg, if given."
+  [args]
+  (if-let [supplied (first args)]
+    (concat core-profiles [supplied])
+    core-profiles))
+
 (defn exec-config
   "Preps and inits the given profiles. Returns the running system."
   [profiles]
@@ -50,10 +58,7 @@
 
 (defn -main [& args]
   (log/info "starting" {:args args})
-  (let [profiles (if-let [supplied (first args)]
-                   (concat core-profiles [supplied])
-                   core-profiles)
-        system   (exec-config profiles)]
+  (let [system (exec-config (profiles-from-args args))]
     (on-shutdown! #(do (log/info "shutdown")
                        (ig/halt! system)))
     (log/info "ready")))

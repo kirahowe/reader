@@ -1,33 +1,33 @@
 {:reader.concerns/http-kit
  {:opts {:port #env/long ["PORT" 8080]}}
 
- ;; Prod supplies its own datasource spec instead of the dev/test
- ;; embedded-postgres fragment. `DATABASE_URL` is the full Neon JDBC
- ;; URL, credentials and `?sslmode=require` included.
+ ;; Prod supplies its own datasource spec; DATABASE_URL is the full Neon
+ ;; JDBC URL. Tuned for cost over latency: `minimum-idle 0` drains the pool
+ ;; so no idle connection keeps Neon awake; short `idle-timeout` releases
+ ;; connections; longer `connection-timeout` absorbs Neon's cold start on
+ ;; the first post-suspend request; `initialization-fail-timeout -1` builds
+ ;; the pool without opening a connection (first connect is the first query).
  ;;
- ;; Tuned to let Neon autosuspend (scale to zero) while the app is in
- ;; development with a handful of test users — optimizing for cost over
- ;; latency. `minimum-idle 0` lets the pool drain fully so no held
- ;; connection keeps the compute awake; a short `idle-timeout` releases
- ;; connections quickly; the longer `connection-timeout` absorbs the
- ;; cold-start delay when the first request after a suspend wakes Neon.
- ;; If real traffic arrives, flip to a fixed-size pool (minimum-idle =
- ;; maximum-pool-size) to trade cost for latency.
+ ;; The worker polls the jobs table ~1/s, so Neon stays awake while any
+ ;; machine runs and autosuspends only once Fly stops the machine.
+ ;; Poll-backoff is a separate planned feature.
  :reader.db/datasource
- {:spec {:jdbc-url           #env "DATABASE_URL"
-         :pool-name          "reader-pool"
-         :maximum-pool-size  10
-         :minimum-idle       0
-         :connection-timeout 30000
-         :idle-timeout       30000
-         :max-lifetime       300000}}
+ {:spec {:jdbc-url                    #env "DATABASE_URL"
+         :pool-name                   "reader-pool"
+         :maximum-pool-size           10
+         :minimum-idle                0
+         :connection-timeout          30000
+         :idle-timeout                30000
+         :max-lifetime                300000
+         :initialization-fail-timeout -1}}
 
- ;; Apply pending migrations on boot. Nothing refs this key yet, but
- ;; Integrant still inits it, so a fresh Neon database is migrated the
- ;; first time the machine starts.
+ ;; `:migrate-on-init? false` makes the component init return the datasource
+ ;; without migrating; migrations run out-of-band via the release_command
+ ;; (see `reader.migrate`). It still inits to back the #ig/ref deps below.
  :reader.db/migrator
- {:datasource      #ig/ref :reader.db/datasource
-  :migrations-path "migrations"}
+ {:datasource       #ig/ref :reader.db/datasource
+  :migrations-path  "migrations"
+  :migrate-on-init? false}
 
  ;; Auth. SITE_ORIGIN is the public origin (e.g. https://reader.example.com)
  ;; for the CSRF check; HANKO_API_URL is the Hanko Cloud project base — the

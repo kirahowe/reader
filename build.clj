@@ -16,7 +16,7 @@
     (b/copy-dir {:src-dirs   ["src" "resources"]
                  :target-dir class-dir})
     (b/compile-clj {:basis      b
-                    :ns-compile '[reader.main]
+                    :ns-compile '[reader.main reader.migrate]
                     :class-dir  class-dir})
     (b/uber {:class-dir class-dir
              :uber-file uber-file

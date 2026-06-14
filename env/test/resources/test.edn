@@ -17,4 +17,4 @@
 
  :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}
 
- :reader.handlers.inbound/create {:hmac-secret "test-inbound-secret"}}
+ :reader.handlers/inbound {:impl :direct :storage #ig/ref :reader.storage/store}}

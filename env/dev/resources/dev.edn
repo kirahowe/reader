@@ -41,5 +41,6 @@
  ;; until the Cloudflare worker + a real domain land (Slice 5).
  :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}
 
- ;; Dev HMAC secret for the inbound webhook (shared with the worker in prod).
- :reader.handlers.inbound/create {:hmac-secret "dev-inbound-secret"}}
+ ;; Dev receives inbound email directly: POST a raw .eml to /api/inbound?alias=…
+ ;; (no HMAC/worker/R2). Open on localhost; set :token for a reachable tenant.
+ :reader.handlers/inbound {:impl :direct :storage #ig/ref :reader.storage/store}}

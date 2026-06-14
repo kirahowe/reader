@@ -21,7 +21,7 @@
    ["/queue/:id/unread"    {:post {:handler #ig/ref :reader.handlers.queue/mark-unread}}]
    ["/settings"            {:get  {:handler #ig/ref :reader.handlers.settings/show}}]
    ["/admin/extractions"   {:get  {:handler #ig/ref :reader.handlers.admin/extractions}}]
-   ["/api/inbound"         {:public? true :post {:handler #ig/ref :reader.handlers.inbound/create}}]
+   ["/api/inbound"         {:public? true :post {:handler #ig/ref :reader.handlers/inbound}}]
    ["/health"              {:public? true :get {:handler #ig/ref :reader.handlers/health}}]
    ["/static/*"            {:public? true :handler #ig/ref :reader.handlers/static}]]}
 
@@ -49,9 +49,10 @@
  ;; Eval dashboard, admin-gated. admin-emails defaults to none; the dev profile
  ;; admits the seeded user, and prod can override with #env/set "ADMIN_EMAILS".
  :reader.handlers.admin/extractions  {:datasource #ig/ref :reader.db/migrator :admin-emails #{}}
- ;; Inbound-email webhook. hmac-secret is supplied per-environment; a nil/blank
- ;; secret makes the endpoint reject every request (fail closed) until it's set.
- :reader.handlers.inbound/create     {:datasource #ig/ref :reader.db/migrator :hmac-secret nil}
+ ;; Inbound-email receiver. One key; each env picks the :impl — :webhook (prod,
+ ;; HMAC-verified) or :direct (dev/test/PR, raw .eml). The datasource is shared;
+ ;; impl-specific opts (:hmac-secret / :storage / :token) come from the profiles.
+ :reader.handlers/inbound            {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 

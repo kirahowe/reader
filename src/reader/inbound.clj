@@ -6,7 +6,8 @@
    enqueue logic, kept out of the HTTP handler."
   (:require [malli.core :as m]
             [reader.inboxes :as inboxes]
-            [reader.jobs :as jobs]))
+            [reader.jobs :as jobs]
+            [reader.storage :as storage]))
 
 (def Payload
   "The signed notification the worker posts. message-id threads through to the
@@ -41,3 +42,16 @@
                    {:user-id    (str (:email-inboxes/user-id inbox))
                     :r2-key     r2-key
                     :message-id message-id})))
+
+(defn deliver!
+  "Direct inbound delivery of a raw `.eml` for `alias` — the dev/test/PR path
+   with no worker, R2, or HMAC. Resolves the alias to a user, stores the bytes
+   via the storage seam, and enqueues the *same* :ingest-email job the prod
+   webhook does (the Message-ID is parsed from the .eml downstream). Returns the
+   job, or nil for an unknown alias."
+  [ds store alias raw-bytes]
+  (when-let [inbox (inboxes/by-alias ds alias)]
+    (let [k (str "inbox/" (random-uuid) ".eml")]
+      (storage/put-object store k raw-bytes "message/rfc822")
+      (jobs/enqueue! ds "ingest-email"
+                     {:user-id (str (:email-inboxes/user-id inbox)) :r2-key k}))))

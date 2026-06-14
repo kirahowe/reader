@@ -313,7 +313,22 @@ Email Routing → an Email Worker that writes the raw `.eml` to R2 and POSTs a
 signed notification to `POST /api/inbound` → the `:ingest-email` job parses
 and files it. The app can't be an MX itself, so this bridge is required (see
 [ADR 0004](docs/adr/0004-deployment-and-infrastructure.md)). The Worker lives
-in [`worker/`](worker/). One-time setup:
+in [`worker/`](worker/).
+
+The receiver is a per-environment Integrant seam (`:reader.handlers/inbound`):
+prod runs `:impl :webhook` (the HMAC contract above); dev/test/PR tenants run
+`:impl :direct`, which skips the worker/R2/HMAC entirely — POST a raw `.eml`
+with the recipient as a query param and it runs the *same* downstream:
+
+```sh
+curl -X POST "http://localhost:3000/api/inbound?alias=<your-/settings-alias>" \
+  -H 'content-type: message/rfc822' --data-binary @some-newsletter.eml
+```
+
+Dev stores the `.eml` on local disk (the `:file` backend under the configurable
+`:reader.storage/file-root`, default `/tmp`), so no R2 is involved. The
+`:direct` endpoint is open on localhost; set its `:token` for a reachable PR
+tenant. The rest of this section is the **production** wiring:
 
 **1. A domain on Cloudflare.** Register (or transfer) a domain so its DNS is on
 Cloudflare — this is the host part of every alias. The app is also served from

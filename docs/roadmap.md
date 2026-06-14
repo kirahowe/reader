@@ -186,8 +186,9 @@ itself (ADR 0004).
 worker, no domain needed):**
 - `reader.storage` — a `Blobs` seam (`:reader.storage/store`), in-memory
   stub in dev/test, R2 in prod. Mirrors embedded-postgres-for-Neon.
-- Per-user `email_inboxes` alias (`r-<token>@<domain>`), provisioned
-  idempotently and surfaced on `/settings`.
+- Per-user `email_inboxes` alias — a friendly haikunator name plus a random
+  token (`aged-morning-k3f9x2@<domain>`), provisioned idempotently (with
+  collision-retry on the unique index) and surfaced on `/settings`.
 - `POST /api/inbound` — public but HMAC-signed (`reader.web.signature`):
   constant-time verify over `timestamp + body`, 5-minute replay window,
   Malli-validated payload, resolves the alias to a user, enqueues

@@ -23,7 +23,8 @@
         org.eclipse.angus/angus-mail      {:mvn/version "2.0.3"}
         com.cognitect.aws/api             {:mvn/version "0.8.741"}
         com.cognitect.aws/endpoints       {:mvn/version "871.2.30.22"}
-        com.cognitect.aws/s3              {:mvn/version "871.2.30.22"}}
+        com.cognitect.aws/s3              {:mvn/version "871.2.30.22"}
+        haikunator/haikunator             {:mvn/version "0.1.0"}}
 
  :aliases
  {:dev    {:extra-paths ["env/dev/src" "env/dev/resources" "infra/src" "infra/resources"]

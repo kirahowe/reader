@@ -21,7 +21,7 @@
               (is (= 200 (:status resp)))
               (is (str/includes? body "me@x.test")))
             (testing "provisions and shows the user's inbound alias at the configured domain"
-              (is (re-find #"r-[0-9a-f]{32}@inbox\.reader\.test" body))
+              (is (re-find #"[a-z]+-[a-z]+-[a-z0-9]{6}@inbox\.reader\.test" body))
               (let [stored (:email-inboxes/alias (crud/find-1 ds :email-inboxes {:user-id uid}))]
                 (is (str/includes? body stored) "the rendered alias is the one persisted")))
             (testing "flags the alias as not yet active"

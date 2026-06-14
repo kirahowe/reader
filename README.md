@@ -315,10 +315,18 @@ and files it. The app can't be an MX itself, so this bridge is required (see
 in [`worker/`](worker/). One-time setup:
 
 **1. A domain on Cloudflare.** Register (or transfer) a domain so its DNS is on
-Cloudflare — this is the host part of every alias. Decide whether the app also
-moves to it (point a record at Fly, add the custom domain in Fly, and update
-`SITE_ORIGIN` + the Hanko app URL) or stays on `*.fly.dev` for now; the email
-path works either way.
+Cloudflare — this is the host part of every alias. The app is also served from
+it, so add the custom domain to Fly and point Hanko at it:
+
+```sh
+flyctl certs add themiscellany.app          # provisions a cert; follow the
+                                            # printed DNS record to add in Cloudflare
+flyctl secrets set SITE_ORIGIN="https://themiscellany.app"
+```
+
+Then set the Hanko project's **app URL** to `https://themiscellany.app`
+(passkeys are origin-bound, so this must match), and set the Worker's
+`READER_API_URL` to the same (step 4).
 
 **2. An R2 bucket + S3 token.** Create a bucket (e.g. `miscellany-inbound`) and
 an R2 API token (an S3 access key id + secret) scoped to it. Note the account
@@ -379,6 +387,23 @@ inline via reader literals like `#env/long ["PORT" 8080]` and
 setup](#one-time-production-setup) and [Inbound
 email](#inbound-email-newsletters) for how those are supplied as Fly
 secrets and a CI deploy token.
+
+### Multiple environments
+
+Every deployed environment runs the **same image and the same `prod.edn`** —
+that profile reads all of its values from the environment, so an environment
+*is* its set of secrets, not a separate config file. Adding one (say staging)
+is therefore cheap and needs no code change:
+
+1. `flyctl apps create <name>` (e.g. `themiscellany-staging`) and deploy the
+   same image to it (`flyctl deploy -a <name>`, or a `fly.staging.toml`).
+2. Set that app's own secrets (its own `DATABASE_URL`, `SITE_ORIGIN`, …).
+3. For inbound email, give it a named worker environment in
+   [`worker/wrangler.toml`](worker/wrangler.toml) (an `[env.staging]` block
+   with its own `READER_API_URL` + bucket) and its own Email Routing domain.
+
+Only `dev`, `test`, and `prod` exist today; the above is the recipe when a new
+one is wanted.
 
 ## Useful docs
 

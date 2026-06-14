@@ -3,6 +3,16 @@
 #   npx wrangler secret put INBOUND_HMAC_SECRET   # same value as the Fly secret
 # Then in the Cloudflare dashboard: Email → Email Routing → Routing rules →
 # set the catch-all action to "Send to a Worker" → this worker.
+#
+# Single environment today (prod). The app image is environment-agnostic (all
+# config is env vars), so adding e.g. staging is just a parallel Fly app plus a
+# named worker environment here — restructure into [env.*] blocks, each with its
+# own name / READER_API_URL / bucket / secret:
+#   [env.staging]
+#   name = "miscellany-inbound-staging"
+#   vars = { READER_API_URL = "https://<staging-host>" }
+#   r2_buckets = [{ binding = "INBOUND_BUCKET", bucket_name = "miscellany-inbound-staging" }]
+# and deploy with `wrangler deploy --env staging`.
 
 name = "miscellany-inbound"
 main = "email-worker.js"
@@ -14,8 +24,7 @@ binding = "INBOUND_BUCKET"
 bucket_name = "miscellany-inbound"
 
 [vars]
-# The app origin the signed notification is POSTed to. Point at the app's public
-# URL — the fly.dev host today, or themiscellany.app if the app moves there.
-READER_API_URL = "https://kirahowe-reader.fly.dev"
+# The app's public origin, where the signed notification is POSTed.
+READER_API_URL = "https://themiscellany.app"
 
 # INBOUND_HMAC_SECRET is a secret, not a var — set it with `wrangler secret put`.

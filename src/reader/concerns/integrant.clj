@@ -14,6 +14,10 @@
 ;; through the init-method above and can be `#ig/ref`'d by components.
 ;; e.g. (derive :reader/base-url :reader/const)
 
+;; The local-filesystem blob-storage root (the :file backend). A plain EDN
+;; constant so the path is configured per-profile, never hardcoded in code.
+(derive :reader.storage/file-root :reader/const)
+
 ;; ---------- EDN reader literals ----------
 
 (defrecord Secret [value]

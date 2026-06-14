@@ -44,20 +44,23 @@
 
  ;; Inbound email (newsletters). Blob storage is Cloudflare R2 — raw .eml files
  ;; the Email Worker dropped there, read back by the :ingest-email job. The
- ;; account id, bucket, and S3 API token come from Fly secrets.
+ ;; account id, bucket, and S3 API token come from Fly secrets. All #env/opt:
+ ;; inbound email is an optional feature, so the app boots (and deploys) before
+ ;; these are set — R2 self-disables until then (see reader.storage.r2/->store).
  :reader.storage/store
  {:backend    :r2
-  :account-id #env "R2_ACCOUNT_ID"
-  :bucket     #env "R2_BUCKET"
-  :access-key #env "R2_ACCESS_KEY_ID"
-  :secret     #env "R2_SECRET_ACCESS_KEY"}
+  :account-id #env/opt "R2_ACCOUNT_ID"
+  :bucket     #env/opt "R2_BUCKET"
+  :access-key #env/opt "R2_ACCESS_KEY_ID"
+  :secret     #env/opt "R2_SECRET_ACCESS_KEY"}
 
  :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
 
  ;; The webhook's shared HMAC secret (same value as the Worker's Wrangler
- ;; secret) and the domain newsletter aliases live at (e.g. themiscellany.app).
- :reader.handlers.inbound/create {:hmac-secret #env "INBOUND_HMAC_SECRET"}
- :reader.handlers.settings/show  {:inbound-domain #env "INBOUND_EMAIL_DOMAIN"}
+ ;; secret); the handler fails closed when it's unset. Alias domain defaults to
+ ;; the registered domain, overridable via the env var.
+ :reader.handlers.inbound/create {:hmac-secret #env/opt "INBOUND_HMAC_SECRET"}
+ :reader.handlers.settings/show  {:inbound-domain #env/opt ["INBOUND_EMAIL_DOMAIN" "themiscellany.app"]}
 
  ;; Background worker draining the ingest jobs (manual URL + inbound email).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator

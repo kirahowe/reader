@@ -43,14 +43,17 @@
 
 (defn ->store
   "An R2-backed Blobs store. `cfg` needs :account-id :bucket :access-key :secret;
-   :region defaults to R2's \"auto\". Fails fast on missing credentials so a
-   misconfigured prod refuses to boot rather than dropping mail silently."
+   :region defaults to R2's \"auto\". When credentials are absent it returns a
+   disabled store (boots, throws on use) rather than failing startup — R2 is an
+   optional feature (inbound email), so a half-configured prod still serves
+   everything else; inbound email activates once the secrets are set."
   [{:keys [account-id bucket access-key secret] :as cfg}]
-  (when (some str/blank? [account-id bucket access-key secret])
-    (throw (ex-info "R2 storage misconfigured (need account-id, bucket, access-key, secret)"
-                    {:missing (->> {:account-id account-id :bucket bucket
-                                    :access-key access-key :secret secret}
-                                   (filter (comp str/blank? val))
-                                   (mapv key))})))
-  (log/info "storage backend r2" {:account-id account-id :bucket bucket})
-  (->R2Store (s3-client cfg) bucket))
+  (if (some str/blank? [account-id bucket access-key secret])
+    (do (log/warn "R2 not configured (missing credentials); blob storage disabled"
+                  {:missing (->> {:account-id account-id :bucket bucket
+                                  :access-key access-key :secret secret}
+                                 (filter (comp str/blank? val))
+                                 (mapv key))})
+        (storage/disabled-store :r2-unconfigured))
+    (do (log/info "storage backend r2" {:account-id account-id :bucket bucket})
+        (->R2Store (s3-client cfg) bucket))))

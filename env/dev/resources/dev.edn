@@ -18,8 +18,12 @@
 
  :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}
 
- ;; The :ingest-email handler reads the raw .eml from blob storage (the
- ;; in-memory stub in dev — a REPL can seed it to exercise the path locally).
+ ;; Dev uses the local-filesystem blob store (no uploads), rooted at the
+ ;; configurable const from embedded-db.edn — override there to relocate it.
+ :reader.storage/store {:backend :file :root #ig/ref :reader.storage/file-root}
+
+ ;; The :ingest-email handler reads the raw .eml from blob storage (the local
+ ;; file store in dev — a REPL can seed it to exercise the path locally).
  :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
 
  ;; Background worker draining the ingest jobs (manual URL + inbound email).

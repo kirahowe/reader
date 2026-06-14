@@ -19,6 +19,8 @@
  {:datasource      #ig/ref :reader.db/datasource
   :migrations-path "migrations"}
 
- ;; In-memory blob store standing in for R2. The real :r2 backend + prod
- ;; wiring land with the inbound-email worker (it needs a real bucket).
- :reader.storage/store {:backend :memory}}
+ ;; Blob storage standing in for R2: tests use the in-memory store; dev
+ ;; overrides to :file (see dev.edn) rooted at this configurable const. The
+ ;; path is plain EDN — defaulted here, never hardcoded in code.
+ :reader.storage/file-root "/tmp/reader-blobs"
+ :reader.storage/store     {:backend :memory}}

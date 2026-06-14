@@ -1,13 +1,18 @@
 (ns reader.storage
   "Blob storage seam — `:reader.storage/store`. Holds opaque bytes by key:
-   raw inbound `.eml` files now, PDFs later. Prod is Cloudflare R2 (S3-compatible,
-   zero egress); dev and tests run an in-memory stub so nothing reaches a real
-   bucket, mirroring how embedded-postgres stands in for Neon.
+   raw inbound `.eml` files now, PDFs later. Pluggable per environment via the
+   `:backend` discriminator, so prod uses the real thing and dev/test/PR tenants
+   use easy local stand-ins:
 
-   Consumers depend only on the `Blobs` protocol, so the backend is swapped by
-   config (`:backend`) without touching the ingest job or any caller — the same
-   seam pattern as the entity extractor and job handlers."
-  (:require [clojure.tools.logging :as log]
+     :memory  in-process atom            (tests — ephemeral, no fs)
+     :file    a local directory          (dev / PR tenants — no uploads, inspectable)
+     :r2      Cloudflare R2              (prod — see reader.storage.r2)
+
+   Consumers depend only on the `Blobs` protocol, so the backend swaps by config
+   without touching the ingest job or any caller."
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [integrant.core :as ig]))
 
 (defprotocol Blobs
@@ -15,6 +20,8 @@
     "The bytes stored under `key` (a byte array), or nil if there's no such object.")
   (put-object [store key ^bytes bytes content-type]
     "Store `bytes` under `key` with `content-type`. Returns `key`."))
+
+;; ── in-memory (tests) ────────────────────────────────────────────────────
 
 (deftype MemoryStore [objects]
   Blobs
@@ -28,14 +35,54 @@
   []
   (->MemoryStore (atom {})))
 
+;; ── local filesystem (dev / PR tenants) ──────────────────────────────────
+
+(deftype FileStore [^java.io.File root]
+  Blobs
+  (get-object [_ key]
+    (let [f (io/file root key)]
+      (when (.isFile f)
+        (with-open [in (io/input-stream f)] (.readAllBytes in)))))
+  (put-object [_ key bytes _content-type]
+    ;; keys are app-generated (e.g. inbox/<uuid>.eml), so the nested path is safe
+    ;; to create directly; content-type isn't persisted (the bytes are all we read).
+    (let [f (io/file root key)]
+      (io/make-parents f)
+      (with-open [out (io/output-stream f)] (.write out ^bytes bytes))
+      key)))
+
+(defn file-store
+  "A Blobs store rooted at directory `root` (created if absent)."
+  [root]
+  (when (str/blank? root)
+    (throw (ex-info "file storage needs a :root directory" {})))
+  (let [dir (io/file root)]
+    (.mkdirs dir)
+    (->FileStore dir)))
+
+;; ── disabled (an unconfigured optional backend) ──────────────────────────
+
+(deftype DisabledStore [reason]
+  Blobs
+  (get-object [_ _] (throw (ex-info "blob storage is not configured" {:reason reason})))
+  (put-object [_ _ _ _] (throw (ex-info "blob storage is not configured" {:reason reason}))))
+
+(defn disabled-store
+  "A store that throws on use — for an optional backend whose config is absent,
+   so the system boots (feature inert) instead of failing at startup."
+  [reason]
+  (->DisabledStore reason))
+
+;; ── seam ─────────────────────────────────────────────────────────────────
+
 (defn open
-  "Construct a Blobs store from a backend config. `:memory` is the dev/test
-   stub; `:r2` is Cloudflare R2 in prod (loaded on demand so the dev/test path
-   never touches it). Fails loud on an unrecognized backend rather than booting
-   a store that drops writes."
+  "Construct a Blobs store from a backend config. `:memory` and `:file` are the
+   local stand-ins; `:r2` is Cloudflare R2 in prod (loaded on demand so the
+   dev/test path never pulls the AWS deps). Fails loud on an unknown backend."
   [{:keys [backend] :as cfg}]
   (case backend
     :memory (memory-store)
+    :file   (file-store (:root cfg))
     :r2     ((requiring-resolve 'reader.storage.r2/->store) cfg)
     (throw (ex-info "unknown storage backend" {:backend backend}))))
 

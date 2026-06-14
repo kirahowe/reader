@@ -30,11 +30,13 @@
 
 (defn open
   "Construct a Blobs store from a backend config. `:memory` is the dev/test
-   stub; `:r2` lands with Slice 5 (it needs a real bucket + credentials). Fails
-   loud on an unrecognized backend rather than booting a store that drops writes."
-  [{:keys [backend]}]
+   stub; `:r2` is Cloudflare R2 in prod (loaded on demand so the dev/test path
+   never touches it). Fails loud on an unrecognized backend rather than booting
+   a store that drops writes."
+  [{:keys [backend] :as cfg}]
   (case backend
     :memory (memory-store)
+    :r2     ((requiring-resolve 'reader.storage.r2/->store) cfg)
     (throw (ex-info "unknown storage backend" {:backend backend}))))
 
 (defmethod ig/init-key :reader.storage/store [_ {:keys [backend] :as cfg}]

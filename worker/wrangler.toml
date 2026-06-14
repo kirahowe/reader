@@ -1,0 +1,21 @@
+# Cloudflare Email Worker for Reader inbound newsletters. Deploy from this dir:
+#   cd worker && npx wrangler deploy
+#   npx wrangler secret put INBOUND_HMAC_SECRET   # same value as the Fly secret
+# Then in the Cloudflare dashboard: Email → Email Routing → Routing rules →
+# set the catch-all action to "Send to a Worker" → this worker.
+
+name = "miscellany-inbound"
+main = "email-worker.js"
+compatibility_date = "2026-06-01"
+
+# The R2 bucket the raw .eml files are written to (created in the dashboard).
+[[r2_buckets]]
+binding = "INBOUND_BUCKET"
+bucket_name = "miscellany-inbound"
+
+[vars]
+# The app origin the signed notification is POSTed to. Point at the app's public
+# URL — the fly.dev host today, or themiscellany.app if the app moves there.
+READER_API_URL = "https://kirahowe-reader.fly.dev"
+
+# INBOUND_HMAC_SECRET is a secret, not a var — set it with `wrangler secret put`.

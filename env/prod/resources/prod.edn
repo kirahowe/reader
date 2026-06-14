@@ -42,9 +42,27 @@
 
  :reader.handlers.auth/login {:api-url #env "HANKO_API_URL"}
 
- ;; Background worker draining :extract-article jobs (manual URL ingest).
+ ;; Inbound email (newsletters). Blob storage is Cloudflare R2 — raw .eml files
+ ;; the Email Worker dropped there, read back by the :ingest-email job. The
+ ;; account id, bucket, and S3 API token come from Fly secrets.
+ :reader.storage/store
+ {:backend    :r2
+  :account-id #env "R2_ACCOUNT_ID"
+  :bucket     #env "R2_BUCKET"
+  :access-key #env "R2_ACCESS_KEY_ID"
+  :secret     #env "R2_SECRET_ACCESS_KEY"}
+
+ :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
+
+ ;; The webhook's shared HMAC secret (same value as the Worker's Wrangler
+ ;; secret) and the domain newsletter aliases live at (e.g. themiscellany.app).
+ :reader.handlers.inbound/create {:hmac-secret #env "INBOUND_HMAC_SECRET"}
+ :reader.handlers.settings/show  {:inbound-domain #env "INBOUND_EMAIL_DOMAIN"}
+
+ ;; Background worker draining the ingest jobs (manual URL + inbound email).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
-                      :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler}
+                      :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler
+                                          "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler}
                       :poll-ms           1000
                       :max-attempts      5
                       :backoff-base-secs 10}

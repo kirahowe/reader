@@ -304,6 +304,58 @@ terminal scrollback; confirm it landed with `gh secret list`.
 With all four done, deploy — `bb deploy`, or push to `main` and let CI
 do it — and watch the rollout with `flyctl logs`.
 
+### Inbound email (newsletters)
+
+Newsletters reach a user's queue by being emailed to their alias
+(`r-<token>@<your-domain>`, shown on `/settings`). The path is: Cloudflare
+Email Routing → an Email Worker that writes the raw `.eml` to R2 and POSTs a
+signed notification to `POST /api/inbound` → the `:ingest-email` job parses
+and files it. The app can't be an MX itself, so this bridge is required (see
+[ADR 0004](docs/adr/0004-deployment-and-infrastructure.md)). The Worker lives
+in [`worker/`](worker/). One-time setup:
+
+**1. A domain on Cloudflare.** Register (or transfer) a domain so its DNS is on
+Cloudflare — this is the host part of every alias. Decide whether the app also
+moves to it (point a record at Fly, add the custom domain in Fly, and update
+`SITE_ORIGIN` + the Hanko app URL) or stays on `*.fly.dev` for now; the email
+path works either way.
+
+**2. An R2 bucket + S3 token.** Create a bucket (e.g. `miscellany-inbound`) and
+an R2 API token (an S3 access key id + secret) scoped to it. Note the account
+id too.
+
+**3. Enable Email Routing** on the domain (adds the MX + SPF records). Leave the
+catch-all rule unset until the Worker is deployed (step 5).
+
+**4. Deploy the Worker.** Edit [`worker/wrangler.toml`](worker/wrangler.toml)
+— set `bucket_name` and `READER_API_URL` (the app's public origin) — then:
+
+```sh
+cd worker
+npx wrangler deploy
+npx wrangler secret put INBOUND_HMAC_SECRET   # any strong random string
+```
+
+**5. Point the catch-all at the Worker.** Cloudflare → Email → Email Routing →
+Routing rules → set the catch-all action to *Send to a Worker* → the deployed
+worker.
+
+**6. Set the app's Fly secrets** (the same `INBOUND_HMAC_SECRET` value as the
+Worker's):
+
+```sh
+flyctl secrets set \
+  INBOUND_HMAC_SECRET="<same value as the Wrangler secret>" \
+  INBOUND_EMAIL_DOMAIN="themiscellany.app" \
+  R2_ACCOUNT_ID="<cloudflare account id>" \
+  R2_BUCKET="miscellany-inbound" \
+  R2_ACCESS_KEY_ID="<r2 access key id>" \
+  R2_SECRET_ACCESS_KEY="<r2 secret access key>"
+```
+
+To verify: grab your alias from `/settings`, email something to it, and watch
+it appear in your queue (`flyctl logs` shows the `:ingest-email` job running).
+
 ### Configuration
 
 Configuration is EDN, not env vars. `base-system.edn` is always
@@ -318,11 +370,14 @@ env/prod/resources/prod.edn        # in the image at /app/conf, on the classpath
 ```
 
 The few values that must come from the environment — the HTTP `PORT`,
-and in prod the database connection string and auth config
-(`DATABASE_URL`, `SITE_ORIGIN`, `HANKO_API_URL`, `ALLOWED_EMAILS`) — are
-pulled in inline via reader literals like `#env/long ["PORT" 8080]` and
+the database connection string and auth config (`DATABASE_URL`,
+`SITE_ORIGIN`, `HANKO_API_URL`, `ALLOWED_EMAILS`), and the inbound-email
+config (`INBOUND_HMAC_SECRET`, `INBOUND_EMAIL_DOMAIN`, `R2_ACCOUNT_ID`,
+`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) — are pulled in
+inline via reader literals like `#env/long ["PORT" 8080]` and
 `#env "DATABASE_URL"`. See [One-time production
-setup](#one-time-production-setup) for how those are supplied as Fly
+setup](#one-time-production-setup) and [Inbound
+email](#inbound-email-newsletters) for how those are supplied as Fly
 secrets and a CI deploy token.
 
 ## Useful docs

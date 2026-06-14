@@ -71,6 +71,7 @@
 
 (defmethod extract :newsletter-issue [{:keys [row] :as readable}]
   (assoc (common readable)
-         :date  (:newsletter-issues/sent-at row)
-         :body  (newsletter-body row)
-         :links []))
+         :date            (:newsletter-issues/sent-at row)
+         :body            (newsletter-body row)
+         :unsubscribe-url (:newsletter-issues/unsubscribe-url row)
+         :links           []))

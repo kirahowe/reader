@@ -56,7 +56,7 @@
    creation), then queue it for `user-id` if it isn't already there. A redelivery
    never disturbs a queue item the user has already read or archived. Returns the
    queue item."
-  [tx user-id {:keys [subject body-html sent-at message-id raw-key from-name from-email]}]
+  [tx user-id {:keys [subject body-html sent-at message-id raw-key from-name from-email unsubscribe-url]}]
   (let [issue
         (or (when message-id (crud/find-1 tx :newsletter-issues {:message-id message-id}))
             (let [aff    (source-for! tx from-email)
@@ -66,7 +66,8 @@
                                         :body-html            (or body-html "")
                                         :sent-at              sent-at
                                         :raw-email-object-key raw-key
-                                        :message-id           message-id})
+                                        :message-id           message-id
+                                        :unsubscribe-url      unsubscribe-url})
                   author (authors/find-or-create! tx (author-name from-name from-email))]
               (crud/create! tx :authorships {:author-id     (:authors/id author)
                                              :readable-type "newsletter_issue"

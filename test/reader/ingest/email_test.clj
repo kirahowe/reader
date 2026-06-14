@@ -11,6 +11,7 @@
              "Subject: Weekly Update"
              "Message-ID: <issue-42@stratechery.com>"
              "Date: Mon, 8 Jun 2026 12:00:00 +0000"
+             "List-Unsubscribe: <https://stratechery.com/unsub?u=42>, <mailto:unsub@stratechery.com>"
              "MIME-Version: 1.0"
              "Content-Type: multipart/alternative; boundary=\"BOUND\""
              ""
@@ -28,7 +29,7 @@
              ""]))
 
 (deftest parse-multipart-alternative
-  (let [{:keys [subject from-name from-email sent-at message-id body-html]}
+  (let [{:keys [subject from-name from-email sent-at message-id unsubscribe-url body-html]}
         (email/parse (.getBytes raw-eml "UTF-8"))]
     (testing "decodes the headers"
       (is (= "Weekly Update" subject))
@@ -36,6 +37,8 @@
       (is (= "ben@stratechery.com" from-email))
       (is (= "<issue-42@stratechery.com>" message-id))
       (is (= (Instant/parse "2026-06-08T12:00:00Z") sent-at)))
+    (testing "picks the https unsubscribe target from List-Unsubscribe (over the mailto)"
+      (is (= "https://stratechery.com/unsub?u=42" unsubscribe-url)))
     (testing "prefers the html alternative and sanitizes it"
       (is (str/includes? body-html "<h1>Hello</h1>"))
       (is (str/includes? body-html "World"))
@@ -51,7 +54,23 @@
                        ""
                        "Just text <not a tag>."
                        ""])
-        {:keys [body-html]} (email/parse (.getBytes raw "UTF-8"))]
+        {:keys [body-html unsubscribe-url]} (email/parse (.getBytes raw "UTF-8"))]
     (testing "a text/plain-only email is wrapped and escaped"
       (is (str/includes? body-html "Just text"))
-      (is (not (str/includes? body-html "<not a tag>")) "angle brackets escaped, not left as markup"))))
+      (is (not (str/includes? body-html "<not a tag>")) "angle brackets escaped, not left as markup"))
+    (testing "no List-Unsubscribe header -> nil"
+      (is (nil? unsubscribe-url)))))
+
+(deftest parse-unsubscribe-mailto-only
+  (let [raw (str/join "\r\n"
+                      ["From: News <hello@example.com>"
+                       "Subject: Mailto only"
+                       "Message-ID: <m1@example.com>"
+                       "List-Unsubscribe: <mailto:leave@example.com?subject=unsub>"
+                       "Content-Type: text/plain; charset=UTF-8"
+                       ""
+                       "Bye."
+                       ""])
+        {:keys [unsubscribe-url]} (email/parse (.getBytes raw "UTF-8"))]
+    (testing "falls back to the mailto unsubscribe when no http(s) is offered"
+      (is (= "mailto:leave@example.com?subject=unsub" unsubscribe-url)))))

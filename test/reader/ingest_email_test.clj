@@ -28,6 +28,8 @@
           (is (= "Weekly Update" (:newsletter-issues/subject issue)))
           (is (str/includes? (:newsletter-issues/body-html issue) "Hello"))
           (is (= k (:newsletter-issues/raw-email-object-key issue)))
+          (is (= "https://stratechery.com/unsub?u=42" (:newsletter-issues/unsubscribe-url issue))
+              "the List-Unsubscribe target is captured for in-app unsubscribe")
 
           (testing "the source is a newsletter affiliation named from the sender domain"
             (let [aff (crud/by-id ds :affiliations (:newsletter-issues/affiliation-id issue))]

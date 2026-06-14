@@ -69,12 +69,14 @@
   (let [out      (extract/extract
                   {:item {:type :newsletter-issue :title "ACT links for the week"
                           :source {:name "ACT" :slug "act"} :authors []}
-                   :row  {:newsletter-issues/sent-at   nil
-                          :newsletter-issues/body-html "<h1>This week's links</h1><p>Body.</p>"}})
+                   :row  {:newsletter-issues/sent-at         nil
+                          :newsletter-issues/body-html       "<h1>This week's links</h1><p>Body.</p>"
+                          :newsletter-issues/unsubscribe-url "https://act.test/unsub"}})
         rendered (str (h/html (:body out)))]
-    (testing "a newsletter issue has no external links"
+    (testing "a newsletter issue has no external links but carries its unsubscribe url"
       (is (= "ACT links for the week" (:title out)))
-      (is (= [] (:links out))))
+      (is (= [] (:links out)))
+      (is (= "https://act.test/unsub" (:unsubscribe-url out))))
     (testing "its stored (ingest-sanitized) body is rendered raw, not a placeholder"
       (is (re-find #"This week's links" rendered))
       (is (re-find #"<h1>" rendered) "stored markup is rendered, not escaped")

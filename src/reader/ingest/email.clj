@@ -1,6 +1,7 @@
 (ns reader.ingest.email
   "Pure MIME parsing for inbound newsletters: raw .eml bytes -> the fields we
-   store {:subject :from-name :from-email :sent-at :message-id :body-html}. Uses
+   store {:subject :from-name :from-email :sent-at :message-id :unsubscribe-url
+   :body-html}. Uses
    Jakarta Mail (Angus) for robust multipart / encoded-word / quoted-printable
    decoding, and jsoup to sanitize the body — newsletter HTML is hostile, so the
    stored body is cleaned here, at the ingest boundary, then rendered raw later
@@ -51,6 +52,17 @@
     {:name  (some-> (.getPersonal a) str/trim not-empty)
      :email (some-> (.getAddress a) str/trim str/lower-case not-empty)}))
 
+(defn- unsubscribe-url
+  "The preferred unsubscribe target from the List-Unsubscribe header (RFC 2369):
+   its angle-bracketed URIs, picking https, else http, else mailto. nil when the
+   header is absent or carries no recognizable URI."
+  [^MimeMessage msg]
+  (let [headers (.getHeader msg "List-Unsubscribe")
+        raw     (when (seq headers) (str/join "," headers))
+        uris    (map second (re-seq #"<([^>]+)>" (or raw "")))]
+    (some (fn [scheme] (first (filter #(str/starts-with? (str/lower-case %) scheme) uris)))
+          ["https:" "http:" "mailto:"])))
+
 (defn parse
   "Parse raw .eml `bytes` into the stored newsletter fields. The body is
    sanitized; everything else is best-effort and nil when absent."
@@ -62,4 +74,5 @@
      :from-email (:email f)
      :sent-at    (some-> (try (.getSentDate msg) (catch Exception _ nil)) .toInstant)
      :message-id (some-> (try (.getMessageID msg) (catch Exception _ nil)) str/trim not-empty)
+     :unsubscribe-url (unsubscribe-url msg)
      :body-html  (sanitize (raw-body msg))}))

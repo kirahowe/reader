@@ -45,6 +45,18 @@
                             [:a.external {:href href :target "_blank" :rel "noopener noreferrer"} label])
                           safe)))))
 
+(defn- unsubscribe-link
+  "The newsletter's own unsubscribe affordance, from its List-Unsubscribe header.
+   Only http(s) (new tab, hardened) and mailto are rendered; any other scheme is
+   dropped, since this href is a stored, sender-controlled value."
+  [{:keys [unsubscribe-url]}]
+  (when (string? unsubscribe-url)
+    (cond
+      (re-find #"(?i)^https?://" unsubscribe-url)
+      [:a.external {:href unsubscribe-url :target "_blank" :rel "noopener noreferrer"} "Unsubscribe"]
+      (re-find #"(?i)^mailto:" unsubscribe-url)
+      [:a {:href unsubscribe-url} "Unsubscribe"])))
+
 (defn- action-form [id verb label]
   [:form {:method "post" :action (str "/queue/" id "/" verb)}
    [:button {:type "submit"} label]])
@@ -73,4 +85,6 @@
      (meta-line content)
      (:body content)
      (links-line (:links content))
-     (controls queue-item)]]))
+     (controls queue-item)
+     (when-let [unsub (unsubscribe-link content)]
+       [:p.reader-unsubscribe unsub])]]))

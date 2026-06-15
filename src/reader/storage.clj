@@ -1,5 +1,5 @@
 (ns reader.storage
-  "Blob storage seam — `:reader.storage/store`. Holds opaque bytes by key:
+  "Blob storage abstraction — `:reader.storage/store`. Holds opaque bytes by key:
    raw inbound `.eml` files now, PDFs later. Pluggable per environment via the
    `:backend` discriminator, so prod uses the real thing and dev/test/PR tenants
    use easy local stand-ins:
@@ -73,7 +73,7 @@
   [reason]
   (->DisabledStore reason))
 
-;; ── seam ─────────────────────────────────────────────────────────────────
+;; ── abstraction ─────────────────────────────────────────────────────────────────
 
 (defn open
   "Construct a Blobs store from a backend config. `:memory` and `:file` are the

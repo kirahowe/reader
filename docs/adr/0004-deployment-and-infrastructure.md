@@ -91,7 +91,7 @@ called from `bb.edn`. No shell scripts. No Makefile.
 
 The infrastructure is four vendors (Fly, Neon, Cloudflare, Hanko),
 each chosen for a specific job and each replaceable through a small,
-well-defined seam: `flyctl deploy`, a JDBC URL, S3 SDK calls (any
+well-defined boundary: `flyctl deploy`, a JDBC URL, S3 SDK calls (any
 S3-compatible store), the inbound-webhook contract, and Hanko JWT
 verification.
 

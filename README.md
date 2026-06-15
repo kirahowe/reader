@@ -315,7 +315,7 @@ and files it. The app can't be an MX itself, so this bridge is required (see
 [ADR 0004](docs/adr/0004-deployment-and-infrastructure.md)). The Worker lives
 in [`worker/`](worker/).
 
-The receiver is a per-environment Integrant seam (`:reader.handlers/inbound`):
+The receiver is a per-environment Integrant abstraction (`:reader.handlers/inbound`):
 prod runs `:impl :webhook` (the HMAC contract above); dev/test/PR tenants run
 `:impl :direct`, which skips the worker/R2/HMAC entirely — POST a raw `.eml`
 with the recipient as a query param and it runs the *same* downstream:

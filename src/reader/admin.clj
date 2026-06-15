@@ -2,7 +2,7 @@
   "Read-only aggregations over extraction_events for the eval dashboard. Every
    query is constant SQL (no user input). This is the instrument that tells us
    when and where the deterministic extraction path is failing — and, once an
-   LLM seam lands, lets us compare its :llm-sourced coverage in the same view,
+   LLM abstraction lands, lets us compare its :llm-sourced coverage in the same view,
    since the rows are grouped by provenance source."
   (:require [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]))

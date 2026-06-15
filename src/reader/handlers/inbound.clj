@@ -1,5 +1,5 @@
 (ns reader.handlers.inbound
-  "POST /api/inbound — the inbound-email receiver, an Integrant seam (one key,
+  "POST /api/inbound — the inbound-email receiver, an Integrant abstraction (one key,
    `:reader.handlers/inbound`) whose `:impl` each environment chooses:
 
      :webhook  (prod)            verify the Cloudflare worker's HMAC-signed

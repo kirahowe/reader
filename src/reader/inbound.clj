@@ -46,7 +46,7 @@
 (defn deliver!
   "Direct inbound delivery of a raw `.eml` for `alias` — the dev/test/PR path
    with no worker, R2, or HMAC. Resolves the alias to a user, stores the bytes
-   via the storage seam, and enqueues the *same* :ingest-email job the prod
+   via the storage abstraction, and enqueues the *same* :ingest-email job the prod
    webhook does (the Message-ID is parsed from the .eml downstream). Returns the
    job, or nil for an unknown alias."
   [ds store alias raw-bytes]

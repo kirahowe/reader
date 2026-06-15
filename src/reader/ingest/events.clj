@@ -7,7 +7,7 @@
    we aggregate (outcome, per-field provenance source, confidences, counts,
    timings) plus a jsonb `provenance` bag for the rest. Because every value
    carries the `:source` that produced it, the dashboard can show coverage *by
-   source* — and when an LLM seam lands, its `:llm`-sourced fields show up in
+   source* — and when an LLM abstraction lands, its `:llm`-sourced fields show up in
    the same view with no schema change."
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]

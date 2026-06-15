@@ -30,7 +30,7 @@
       (into [:div.reader-meta.muted] (interpose " · " parts)))))
 
 (defn- http-url?
-  "True only for http(s) URLs. This is the render seam where a DB-sourced href
+  "True only for http(s) URLs. This is the render boundary where a DB-sourced href
    first becomes clickable; rejecting other schemes (e.g. `javascript:`) here
    stops a stored value from executing on click regardless of how it was written."
   [href]

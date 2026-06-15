@@ -1,5 +1,5 @@
 (ns reader.storage.r2
-  "Cloudflare R2 backend for the storage seam, via Cognitect aws-api (R2 is
+  "Cloudflare R2 backend for the storage abstraction, via Cognitect aws-api (R2 is
    S3-compatible). One S3 client per store, pointed at the account's R2 endpoint;
    get/put a single object by key. Loaded on demand by `reader.storage/open` only
    when `:backend :r2`, so dev/test never pull the AWS deps at runtime."

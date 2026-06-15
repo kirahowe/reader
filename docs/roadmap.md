@@ -156,7 +156,7 @@ queued asynchronously.
   (canonical url, fetched-on), enqueues it on the queue, and enqueues an
   `:extract-article` job; an HTMX row polls `/queue/:id/row` until done.
 - `reader.ingest` + `reader.ingest.{fetch,extract,entities,events}` —
-  jsoup + Readability4J body extraction, with a swappable entity seam
+  jsoup + Readability4J body extraction, with a swappable entity abstraction
   (deterministic metadata extractor now, LLM-backed later) behind the
   EntityResult contract.
 - `reader.jobs.worker` — Integrant-owned core.async loop draining the
@@ -184,7 +184,7 @@ itself (ADR 0004).
 
 **Server side — delivered (Slices 0–4, behind a stubbed R2 + simulated
 worker, no domain needed):**
-- `reader.storage` — a `Blobs` seam (`:reader.storage/store`), in-memory
+- `reader.storage` — a `Blobs` abstraction (`:reader.storage/store`), in-memory
   stub in dev/test, R2 in prod. Mirrors embedded-postgres-for-Neon.
 - Per-user `email_inboxes` alias — a friendly haikunator name plus a random
   token (`aged-morning-k3f9x2@<domain>`), provisioned idempotently (with

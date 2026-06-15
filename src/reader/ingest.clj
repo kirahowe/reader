@@ -5,7 +5,7 @@
 
    `persist!` is the write edge — it finalizes a placeholder article from an
    extraction. Author/affiliation extraction goes through the swappable entity
-   seam (reader.ingest.entities today, an LLM-backed implementation tomorrow)."
+   abstraction (reader.ingest.entities today, an LLM-backed implementation tomorrow)."
   (:require [clojure.tools.logging :as log]
             [honey.sql :as sql]
             [integrant.core :as ig]
@@ -67,7 +67,7 @@
   "Job handler: fetch `url`, extract body + entities, finalize the placeholder
    article `:article-id`, and record an extraction event. `:fetch-fn` and
    `:extract-entities` are injected — tests stub the network, and the entity
-   step is the swappable LLM seam. Records a failure event and re-throws on any
+   step is the swappable LLM abstraction. Records a failure event and re-throws on any
    error so the worker marks the job for retry. Payload ids arrive as strings
    (jsonb doesn't preserve uuid), so `:article-id` is parsed."
   [ds {:keys [article-id url]} {:keys [fetch-fn extract-entities]}]
@@ -122,7 +122,7 @@
   (fn [ds payload] (ingest-email! ds store payload)))
 
 (defmethod ig/init-key :reader.ingest/entity-extractor [_ _]
-  ;; The default entity-extraction seam. Swap this key's value for an
+  ;; The default entity-extraction abstraction. Swap this key's value for an
   ;; LLM-backed extractor (same EntityResult contract) when the eval dashboard
   ;; shows the metadata path leaving authors on the table — no consumer changes.
   entities/from-metadata)

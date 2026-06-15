@@ -1,5 +1,5 @@
 (ns reader.extract
-  "The extraction seam. Turns a stored readable (`reader.readables/find-one`
+  "The extraction abstraction. Turns a stored readable (`reader.readables/find-one`
    payload) into a uniform content map the reader view renders blind to type:
    {:title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.

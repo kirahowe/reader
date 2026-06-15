@@ -56,7 +56,7 @@
  :reader.handlers/health {}
  :reader.handlers/static {:root "public"}
 
- ;; Ingest. `entity-extractor` is the swappable entity seam — the deterministic
+ ;; Ingest. `entity-extractor` is the swappable entity abstraction — the deterministic
  ;; metadata reader now, an LLM-backed extractor later behind the same
  ;; EntityResult contract. The worker that drains :extract-article jobs is wired
  ;; in the dev/prod profiles (kept out of the test profile so no background

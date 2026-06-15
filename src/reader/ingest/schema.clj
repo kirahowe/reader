@@ -2,7 +2,7 @@
   "Malli contracts for the ingest pipeline — the explicit, enforceable
    interface between extraction and the rest of the system.
 
-   `EntityResult` is the seam every entity-extraction implementation must
+   `EntityResult` is the contract every entity-extraction implementation must
    satisfy: the deterministic metadata reader today (reader.ingest.entities),
    and a future LLM-backed extractor wired in by config tomorrow. Its caps
    (max author count + name length) are deliberate — they are also the
@@ -37,7 +37,7 @@
     [:confidence Confidence]]])
 
 (def EntityResult
-  "Output contract of the entity-extraction seam. The 50-author / 200-char
+  "Output contract of the entity-extraction abstraction. The 50-author / 200-char
    caps bound adversarial (e.g. LLM-induced) output."
   [:map {:closed true}
    [:authors [:vector {:max 50} Author]]
@@ -61,7 +61,7 @@
    [:signals :map]])
 
 (def ExtractionContext
-  "What reader.ingest.extract produces and the entity seam consumes."
+  "What reader.ingest.extract produces and the entity-extraction abstraction consumes."
   [:map
    [:url :string]
    [:signals [:map
@@ -85,8 +85,8 @@
     (when t (subs t 0 (min (count t) max-name-len)))))
 
 (defn coerce-entities
-  "Clamp a seam's result to the EntityResult caps (<=50 authors, <=200-char
-   names), dropping any author left blank. The boundary guard on untrusted seam
+  "Clamp an extraction result to the EntityResult caps (<=50 authors, <=200-char
+   names), dropping any author left blank. The boundary guard on untrusted extractor
    output (e.g. a future LLM extractor): applied to every implementation's
    result before it reaches the database, so the contract's caps actually bind
    regardless of which implementation produced the result."

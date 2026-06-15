@@ -1,5 +1,5 @@
 (ns reader.ingest.entities
-  "The default implementation of the entity-extraction seam: derive first-class
+  "The default implementation of the entity-extraction abstraction: derive first-class
    authors + affiliation from the page's declared metadata (the signals/fields
    reader.ingest.extract produced). Returns a reader.ingest.schema/EntityResult.
 
@@ -77,7 +77,7 @@
 
 (defn- resolve-affiliation
   "The publication, lifted from the already-resolved site-name field (keeping
-   its provenance). A model-backed seam could infer this from the body instead;
+   its provenance). A model-backed implementation could infer this from the body instead;
    the contract is the same."
   [context]
   (let [{:keys [value source]} (get-in context [:fields :site-name])]
@@ -89,7 +89,7 @@
     (if (seq cs) (double (/ (reduce + cs) (count cs))) 0.0)))
 
 (defn from-metadata
-  "Entity extraction from declared metadata — the default seam implementation."
+  "Entity extraction from declared metadata — the default implementation."
   [context]
   (let [authors     (resolve-authors context)
         affiliation (resolve-affiliation context)]

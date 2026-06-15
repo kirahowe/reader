@@ -139,6 +139,8 @@ One row per inbound newsletter email.
 | `body_html`             | text        | cleaned-up HTML body                       |
 | `sent_at`               | timestamptz |                                            |
 | `raw_email_object_key`  | text        | key in the R2 bucket for the original .eml |
+| `message_id`            | text NULL UK | email `Message-ID`; redelivery idempotency key (partial UNIQUE over present values) |
+| `unsubscribe_url`       | text NULL   | `List-Unsubscribe` target, surfaced as a one-click link in the reader |
 | `created_at`            | timestamptz |                                            |
 
 ### `authorships`
@@ -286,6 +288,8 @@ erDiagram
     text subject
     text body_html
     text raw_email_object_key
+    text message_id
+    text unsubscribe_url
     timestamptz sent_at
   }
 

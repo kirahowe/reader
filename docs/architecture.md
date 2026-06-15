@@ -112,10 +112,10 @@ at use-time.
 | `:reader.db/datasource`                      | HikariCP-pooled Postgres `DataSource`               |
 | `:reader.db/migrator`                        | Migratus runner — applies pending migrations at startup |
 | `:reader.dev.infra/postgres` *(dev/test)*    | embedded-postgres lifecycle, provides the JDBC spec |
-| `:reader.storage/r2` *(soon)*                | the S3 SDK client wired to R2                       |
+| `:reader.storage/store`                      | the `Blobs` blob-storage abstraction — memory (test) / file (dev) / R2 (prod) |
 | `:reader.cache/lru` *(soon)*                 | a named core.cache instance                         |
-| `:reader.jobs/worker` *(soon)*               | a core.async loop draining the `jobs` table         |
-| `:reader.inbound/parser` *(soon)*            | email parsing pipeline                              |
+| `:reader.jobs/worker`                        | core.async loop draining the `jobs` table (`:extract-article`, `:ingest-email`) |
+| `:reader.ingest/ingest-email-handler`        | the `:ingest-email` job — parse the `.eml`, file the issue |
 
 `concerns/` (server, router, default-handler) cover library-specific glue code,
 and `handlers/` (one ig key per route handler) are our app/domain-specific code.

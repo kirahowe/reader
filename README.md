@@ -212,8 +212,11 @@ Fly's HTTPS edge, with Neon for Postgres and Cloudflare R2 for blob
 storage. The unit of deployment is a container image built from the
 multi-stage [`Dockerfile`](Dockerfile), which produces an
 `eclipse-temurin:25-jre` image with the uberjar at `/app/reader.jar`
-and the prod profile at `/app/conf/prod.edn`, run via
-`ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar", "reader.main", "prod.edn"]`.
+and the prod profile at `/app/conf/prod.edn`. The image splits
+`ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar"]` (the JVM prefix)
+from `CMD ["reader.main", "prod.edn"]` (the app server) — so Fly's
+`release_command` (run as ENTRYPOINT + command) cleanly becomes
+`java … reader.migrate prod.edn` rather than extra args to `reader.main`.
 
 ### Automatic (the normal path)
 

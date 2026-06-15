@@ -17,4 +17,9 @@ WORKDIR /app
 COPY --from=build /app/target/reader.jar /app/reader.jar
 COPY env/prod/resources /app/conf
 EXPOSE 8080
-ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar", "reader.main", "prod.edn"]
+# ENTRYPOINT is the JVM prefix; CMD is the default command (the app server).
+# Split so Fly's release_command (which Fly runs as ENTRYPOINT + release_command,
+# replacing CMD) becomes `java … reader.migrate prod.edn` rather than extra args
+# to reader.main. See fly.toml [deploy] release_command.
+ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar"]
+CMD ["reader.main", "prod.edn"]

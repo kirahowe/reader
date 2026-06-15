@@ -4,9 +4,11 @@ primary_region = "yyz"
 [build]
 
 # Applies pending migrations once per deploy in a throwaway machine before
-# any app machine boots. A failed migration fails the deploy.
+# any app machine boots. A failed migration fails the deploy. Fly runs this as
+# the image ENTRYPOINT + release_command (replacing CMD), so this is just the
+# main + arg — the JVM prefix lives in the Dockerfile ENTRYPOINT.
 [deploy]
-  release_command = "java -cp /app/conf:/app/reader.jar reader.migrate prod.edn"
+  release_command = "reader.migrate prod.edn"
 
 [env]
   PORT = "8080"

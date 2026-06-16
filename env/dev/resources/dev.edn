@@ -18,6 +18,12 @@
 
  :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}
 
+ ;; Persist the embedded-postgres data dir so the dev DB (and your seeded user
+ ;; + queue) survives a server restart or REPL `(reset)`. Tests leave this unset,
+ ;; so each run still gets a fresh throwaway cluster. Delete the dir for a clean
+ ;; slate (e.g. after a destructive migration).
+ :reader.dev.infra/postgres {:data-dir "/tmp/reader-dev-db"}
+
  ;; Dev uses the local-filesystem blob store (no uploads), rooted at the
  ;; configurable const from embedded-db.edn — override there to relocate it.
  :reader.storage/store {:backend :file :root #ig/ref :reader.storage/file-root}

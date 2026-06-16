@@ -1,22 +1,17 @@
 (ns reader.concerns.reitit
   (:require [integrant.core :as ig]
-            [reitit.ring :as ring]
-            [reitit.ring.middleware.parameters :as parameters]))
+            [reitit.ring :as ring]))
 
 (defmethod ig/init-key :reader.concerns.reitit/ring-handler
   [_ {:keys [router default-handler opts]}]
   (ring/ring-handler router default-handler (or opts {})))
 
 (defmethod ig/init-key :reader.concerns.reitit/router [_ {:keys [data middleware opts]}]
-  ;; Middleware are functions, not EDN literals, so they're injected here rather
-  ;; than in the route data. parameters-middleware (parses query/form params into
-  ;; :params) runs first; `middleware` carries the cross-cutting components — CSRF
-  ;; then auth — supplied via #ig/ref from config. Any :data :middleware already
-  ;; on `opts` is appended, not clobbered.
-  (let [opts  (or opts {})
-        stack (into [parameters/parameters-middleware]
-                    (concat middleware (get-in opts [:data :middleware])))]
-    (ring/router data (assoc-in opts [:data :middleware] stack))))
+  ;; `middleware` is the whole cross-cutting stack in outermost-first order,
+  ;; assembled in the system config. Middleware are functions, not EDN literals,
+  ;; so each is its own Integrant component injected via #ig/ref; mounting them
+  ;; on the router :data applies them to every matched route.
+  (ring/router data (assoc-in (or opts {}) [:data :middleware] (vec middleware))))
 
 (defmethod ig/init-key :reader.concerns.reitit/default-handler [_ _]
   ;; The default-handler runs OUTSIDE the route :data :middleware (auth + CSRF),

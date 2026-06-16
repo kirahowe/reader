@@ -33,6 +33,11 @@
   [message]
   (html 403 (layout/forbidden message)))
 
+(defn server-error
+  "A 500 HTML page."
+  []
+  (html 500 (layout/server-error)))
+
 (defn expire-cookie
   "Add a Set-Cookie header to `response` that immediately expires cookie `name`."
   [response name]

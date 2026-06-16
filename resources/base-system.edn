@@ -1,8 +1,19 @@
 {:reader.log/publisher
  {:pretty? false}
 
+ ;; The cross-cutting middleware stack, outermost-first: request-log wraps
+ ;; everything (so it times and records even rejected requests), exception is the
+ ;; catch-all 500 gate, then params parsing, then the CSRF and auth gates closest
+ ;; to the handler. Each entry is its own component (functions can't be EDN).
+ :reader.web.middleware/request-log {}
+ :reader.web.middleware/exception   {}
+ :reader.web.middleware/parameters  {}
+
  :reader.concerns.reitit/router
- {:middleware [#ig/ref :reader.web/csrf
+ {:middleware [#ig/ref :reader.web.middleware/request-log
+               #ig/ref :reader.web.middleware/exception
+               #ig/ref :reader.web.middleware/parameters
+               #ig/ref :reader.web/csrf
                #ig/ref :reader.auth/middleware]
   :data
   [["/"                    {:get  {:handler #ig/ref :reader.handlers/home}}]

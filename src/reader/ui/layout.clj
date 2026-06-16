@@ -38,3 +38,13 @@
          [:p.muted message]
          [:form {:method "post" :action "/logout"}
           [:button {:type "submit"} "Sign out"]]]))
+
+(defn server-error
+  "The body for a 500. Deliberately static — it renders no request detail, since
+   the exception middleware reaches here precisely when something is broken."
+  []
+  (page "Something went wrong"
+        [:main
+         [:h1 "Something went wrong"]
+         [:p.muted "An unexpected error occurred. The problem has been logged."]
+         [:p [:a {:href "/"} "Back to your reading list"]]]))

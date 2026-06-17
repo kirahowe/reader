@@ -1,5 +1,52 @@
 (ns reader.ui.components
-  "Small shared hiccup fragments used across page namespaces.")
+  "The design system's building blocks: small, composable hiccup primitives that
+   every page is assembled from, so new screens stay consistent by construction.
+
+   Conventions
+   - Each primitive returns plain hiccup and owns a single semantic class
+     (`.card`, `.chip`, `.field`, …). Styling lives in main.css under the same
+     name — no inline styles, no utility-class soup.
+   - Variants are modifier classes on the block: `chip--read`, `btn--primary`.
+   - Icons are 24×24, stroke `currentColor`, and inherit their size from CSS.
+
+   See docs/design-system.md for the full catalogue."
+  (:require [clojure.string :as str]))
+
+;; ---------------------------------------------------------------------------
+;; Icons — inline SVG so they inherit `color` and font-size from their context.
+;; ---------------------------------------------------------------------------
+
+(def icon-book
+  "The wordmark glyph: an open book."
+  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
+   [:path {:d "M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5V5.5Z"
+           :stroke "currentColor" :stroke-width "1.7" :stroke-linejoin "round"}]
+   [:path {:d "M20 5.5C20 4.7 19.3 4 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5V5.5Z"
+           :stroke "currentColor" :stroke-width "1.7" :stroke-linejoin "round"}]])
+
+(def icon-trash
+  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
+   [:path {:d "M18 6L17.1991 18.0129C17.129 19.065 17.0939 19.5911 16.8667 19.99C16.6666 20.3412 16.3648 20.6235 16.0011 20.7998C15.588 21 15.0607 21 14.0062 21H9.99377C8.93927 21 8.41202 21 7.99889 20.7998C7.63517 20.6235 7.33339 20.3412 7.13332 19.99C6.90607 19.5911 6.871 19.065 6.80086 18.0129L6 6M4 6H20M16 6L15.7294 5.18807C15.4671 4.40125 15.3359 4.00784 15.0927 3.71698C14.8779 3.46013 14.6021 3.26132 14.2905 3.13878C13.9376 3 13.523 3 12.6936 3H11.3064C10.477 3 10.0624 3 9.70951 3.13878C9.39792 3.26132 9.12208 3.46013 8.90729 3.71698C8.66405 4.00784 8.53292 4.40125 8.27064 5.18807L8 6M14 10V17M10 10V17"
+           :stroke "currentColor" :stroke-width "2"
+           :stroke-linecap "round" :stroke-linejoin "round"}]])
+
+(def icon-chevron-left
+  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
+   [:path {:d "M15 18l-6-6 6-6" :stroke "currentColor" :stroke-width "2"
+           :stroke-linecap "round" :stroke-linejoin "round"}]])
+
+;; ---------------------------------------------------------------------------
+;; Class helper — merge a base class with optional modifier/extra classes.
+;; ---------------------------------------------------------------------------
+
+(defn- classes
+  "Join non-nil class fragments into a single space-separated string."
+  [& parts]
+  (->> parts (remove nil?) (str/join " ") not-empty))
+
+;; ---------------------------------------------------------------------------
+;; Links & text
+;; ---------------------------------------------------------------------------
 
 (defn author-link [{:keys [name slug]}]
   [:a {:href (str "/authors/" slug)} name])
@@ -10,3 +57,100 @@
   [authors]
   (when (seq authors)
     (into [:span] (interpose ", " (map author-link authors)))))
+
+(defn kicker
+  "The small uppercase eyebrow above a headline (e.g. a source name)."
+  [text]
+  [:span.kicker text])
+
+;; ---------------------------------------------------------------------------
+;; Buttons — a bare <button> is the quiet secondary control; `:variant` adds a
+;; modifier. `:primary` fills with the accent, `:icon` is a quiet glyph button,
+;; `:link` reads as inline text. `opts` is merged onto the element.
+;; ---------------------------------------------------------------------------
+
+(def ^:private button-variant
+  {:primary "btn--primary" :icon "btn--icon" :link "btn--link"})
+
+(defn button
+  "A <button>. Pass `:variant` in `opts` for a non-default style; any other keys
+   (`:type`, `:aria-label`, hx-* …) pass straight through."
+  [opts & content]
+  (let [attrs (-> (dissoc opts :variant)
+                  (update :class #(classes % (button-variant (:variant opts)))))]
+    (into [:button attrs] content)))
+
+(defn link-button
+  "An <a> that looks like the quiet ghost button (used for secondary page
+   actions like “Add manually”)."
+  [href label]
+  [:a.ghost-link {:href href} label])
+
+;; ---------------------------------------------------------------------------
+;; Chips — small status pills. nil variant is the accent chip; pass a keyword
+;; (`:read`, `:reading`) for a modifier.
+;; ---------------------------------------------------------------------------
+
+(defn chip
+  ([text] (chip nil text))
+  ([variant text]
+   [:span {:class (classes "chip" (when variant (str "chip--" (name variant))))} text]))
+
+;; ---------------------------------------------------------------------------
+;; Containers
+;; ---------------------------------------------------------------------------
+
+(defn card
+  "A raised surface (settings blocks, callouts)."
+  [& content]
+  (into [:section.card] content))
+
+(defn page-head
+  "The standard heading row: a title (optionally with a subtitle) on the left and
+   an optional action (a link or button) on the right."
+  ([title] (page-head title nil nil))
+  ([title subtitle] (page-head title subtitle nil))
+  ([title subtitle action]
+   [:div.page-head
+    [:div
+     [:h1 title]
+     (when subtitle [:p.page-sub.muted subtitle])]
+    action]))
+
+(defn back-link
+  "The back affordance shown at the top of sub-pages."
+  ([href] (back-link href "Reading list"))
+  ([href label]
+   [:nav.backnav
+    [:a {:href href} [:span {:aria-hidden "true"} icon-chevron-left] label]]))
+
+;; ---------------------------------------------------------------------------
+;; Form fields — a labelled control with an optional error, so every form reads
+;; the same. `error` is the seq of messages Malli yields (we show the first).
+;; ---------------------------------------------------------------------------
+
+(defn- field [label control error]
+  [:label.field
+   [:span.label-text label]
+   control
+   (when error [:span.error (first error)])])
+
+(defn text-field
+  ([label input-name value error] (text-field label input-name value error "text"))
+  ([label input-name value error input-type]
+   (field label [:input {:type input-type :name input-name :value value}] error)))
+
+(defn textarea-field [label input-name value error]
+  (field label [:textarea {:name input-name} value] error))
+
+(defn select-field
+  "`options` is a seq of {:value :label} maps; `selected` is the chosen value."
+  [label input-name options selected error]
+  (field label
+         (into [:select {:name input-name}]
+               (map (fn [{:keys [value label]}]
+                      [:option (cond-> {:value value}
+                                 (= value selected) (assoc :selected true))
+                       label])
+                    options))
+         error))

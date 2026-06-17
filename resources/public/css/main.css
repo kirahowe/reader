@@ -1,7 +1,20 @@
 /* ============================================================
    Reading Room — a calm, bookish, editorial reading queue.
    Warm paper, serif headlines, a single deep-green accent, and
-   sharp modern corners. Tokens live in tokens.css.
+   sharp modern corners.
+
+   This stylesheet is the design system. It is organised in layers,
+   top to bottom, and every rule is keyed to a semantic class that
+   matches a hiccup primitive in reader.ui.components — there are no
+   utility classes. To add UI, reuse a primitive; to restyle, edit
+   the one rule here. See docs/design-system.md.
+
+     1. Base        — reset, elements (headings, links, buttons)
+     2. App shell   — .topbar, .brand, .topnav, <main>
+     3. Primitives  — .btn, .chip, .card, .page-head, .field, .backnav
+     4. Views       — .readables, .reader, .login, .settings, .eval
+
+   Design tokens (colour, type, spacing, radii) live in tokens.css.
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -40,9 +53,10 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: var(--s-6) 0; }
 
 .muted { color: var(--muted); }
 
-/* ---- Buttons -------------------------------------------------
-   The bare element is a quiet secondary control; primary actions
-   (form submits, the reader's first action) fill with the accent. */
+/* ---- Buttons (primitive: components/button) ------------------
+   A bare <button> is the quiet secondary control. Variants add a
+   modifier class: .btn--primary (accent fill), .btn--icon (a quiet
+   glyph button), .btn--link (reads as inline text). */
 button {
   font: inherit;
   font-weight: 500;
@@ -56,6 +70,52 @@ button {
 }
 button:hover { border-color: var(--ink-soft); }
 button:active { transform: translateY(0.5px); }
+
+.btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.btn--primary:hover { border-color: var(--accent); filter: brightness(1.07); }
+@media (prefers-color-scheme: dark) { .btn--primary { color: #10201b; } }
+
+.btn--icon {
+  display: inline-flex;
+  padding: var(--s-2);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.btn--icon:hover { background: var(--rule); color: var(--gold); border-color: transparent; }
+.btn--icon svg { display: block; width: 1.1rem; height: 1.1rem; }
+
+.btn--link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+.btn--link:hover { color: var(--accent); border-color: transparent; }
+
+/* ---- Chips (primitive: components/chip) ----------------------
+   A small status pill. The default is an accent chip; modifiers
+   recolour it for queue states. */
+.chip {
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.22em 0.5em;
+  border-radius: var(--r-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+  line-height: 1.5;
+}
+.chip--read { background: transparent; color: var(--muted); border: 1px solid var(--rule-2); }
+.chip--reading { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
 
 /* ---- Top bar / app shell ------------------------------------
    A sticky, translucent masthead with the wordmark and the primary
@@ -93,10 +153,8 @@ button:active { transform: translateY(0.5px); }
 .topnav a { color: var(--muted); padding: 0.2rem 0; border-bottom: 2px solid transparent; }
 .topnav a:hover { color: var(--ink); }
 .topnav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
-/* Sign-out is a POST, so a real <button>, dressed to read as a nav link. */
+/* Sign-out is a POST, so a real <button> with the .btn--link variant. */
 .logout { display: inline-flex; }
-.logout button { padding: 0; border: 0; background: none; color: var(--muted); font-weight: 500; }
-.logout button:hover { color: var(--accent); border-color: transparent; }
 
 main {
   max-width: var(--feed);
@@ -155,16 +213,8 @@ main {
 }
 .add-url input::placeholder { color: var(--muted); }
 .add-url input:focus { outline: none; }
-.add-url button[type="submit"] {
-  border: 0;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  padding: var(--s-3) var(--s-5);
-  border-radius: var(--r-sm);
-}
-.add-url button[type="submit"]:hover { filter: brightness(1.07); }
-@media (prefers-color-scheme: dark) { .add-url button[type="submit"] { color: #10201b; } }
+/* The submit is a .btn--primary; the bar only sets its size. */
+.add-url .btn--primary { padding: var(--s-3) var(--s-5); }
 
 /* ---- The reading list --------------------------------------- */
 .readables, .entities { list-style: none; padding: 0; margin: 0; }
@@ -220,35 +270,10 @@ main {
 .readable-meta a { color: var(--ink-soft); }
 .readable-meta a:hover { color: var(--accent); }
 
-.queue-state {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.22em 0.5em;
-  border-radius: var(--r-sm);
-  background: var(--accent-tint);
-  color: var(--accent);
-  line-height: 1.5;
-}
-.state-read { background: transparent; color: var(--muted); border: 1px solid var(--rule-2); }
-.state-reading { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
-
-/* The row action: a quiet icon button that only surfaces on hover. */
+/* The row action (.btn--icon) is hidden until the row is hovered. */
 .readable-actions { flex-shrink: 0; }
-.readable-actions button {
-  display: inline-flex;
-  padding: var(--s-2);
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--muted);
-  opacity: 0;
-  transition: opacity .15s, background .15s, color .15s;
-}
-.readable:hover .readable-actions button { opacity: 1; }
-.readable-actions button:hover { background: var(--rule); color: var(--gold); }
-.readable-actions svg { display: block; width: 1.1rem; height: 1.1rem; }
+.readable-actions .btn--icon { opacity: 0; transition: opacity .15s, background .15s, color .15s; }
+.readable:hover .readable-actions .btn--icon { opacity: 1; }
 
 /* Importing / failed states */
 .readable.importing .readable-title {
@@ -307,15 +332,7 @@ main {
 .form select:focus:not(:focus-visible) { outline: none; }
 .form textarea { min-height: 7rem; resize: vertical; }
 .form .error { color: var(--gold); font-size: 0.8125rem; margin-top: var(--s-1); }
-.form button[type="submit"] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  padding-inline: var(--s-5);
-}
-.form button[type="submit"]:hover { filter: brightness(1.07); border-color: var(--accent); }
-@media (prefers-color-scheme: dark) { .form button[type="submit"] { color: #10201b; } }
+.form .btn--primary { padding-inline: var(--s-5); }
 
 /* ---- Reader view -------------------------------------------- */
 .reader { max-width: var(--measure); margin-inline: auto; }
@@ -377,9 +394,6 @@ main {
   border-top: 1px solid var(--rule);
 }
 .reader-actions button { font-weight: 500; }
-.reader-actions form:first-child button { border-color: var(--accent); background: var(--accent); color: #fff; }
-.reader-actions form:first-child button:hover { filter: brightness(1.07); }
-@media (prefers-color-scheme: dark) { .reader-actions form:first-child button { color: #10201b; } }
 
 /* ---- Login -------------------------------------------------- */
 .login-main { display: flex; min-height: 100vh; align-items: center; justify-content: center; max-width: none; padding: var(--s-5); }
@@ -388,33 +402,60 @@ main {
 .brand-lg .brand-mark svg { width: 1.7rem; height: 1.7rem; }
 .login-card h1 { font-size: 2rem; margin-bottom: var(--s-2); }
 .login-tag { margin-bottom: var(--s-6); }
-/* The Hanko web component renders the actual fields; we frame it in a card
-   and pass it a few theme variables so it inherits the palette. */
+/* Hanko renders the actual auth flow inside a shadow root, so we theme it the
+   two supported ways (see docs.hanko.io/guides/hanko-elements/customize-appearance):
+   its CSS custom properties (which pierce the shadow boundary) map the widget
+   onto our tokens, and a few ::part() rules sharpen the controls to match. We
+   frame the host element itself as the card and hide its built-in headline,
+   since the page already provides one. */
 .login-card hanko-auth {
   display: block;
   text-align: left;
-  padding: var(--s-6);
   background: var(--paper-2);
   border: 1px solid var(--rule);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);
+
   --color: var(--ink);
   --color-shade-1: var(--muted);
   --color-shade-2: var(--rule-2);
   --brand-color: var(--accent);
   --brand-color-shade-1: var(--accent);
+  --brand-contrast-color: #fff;
   --background-color: var(--paper-2);
+  --error-color: var(--gold);
+  --link-color: var(--accent);
   --font-family: var(--font-ui);
+  --font-size: 1rem;
+  --font-weight: 400;
   --border-radius: var(--r-sm);
-  --button-border-radius: var(--r-sm);
-  --input-border-radius: var(--r-sm);
+  --border-style: solid;
+  --border-width: 1px;
+  --item-height: 2.85rem;
+  --item-margin: 0.6rem 0;
+  --container-padding: var(--s-6);
+  --container-max-width: 100%;
+  --headline2-font-size: 0.8125rem;
+  --headline2-font-weight: 600;
+  --link-text-decoration: none;
+  --link-text-decoration-hover: underline;
 }
+@media (prefers-color-scheme: dark) {
+  .login-card hanko-auth { --brand-contrast-color: #10201b; }
+}
+/* The page renders its own "Welcome back" headline above the card. */
+.login-card hanko-auth::part(headline1) { display: none; }
+.login-card hanko-auth::part(primary-button) { font-weight: 600; }
+.login-card hanko-auth::part(input),
+.login-card hanko-auth::part(button) { border-radius: var(--r-sm); }
+
+/* ---- Card (primitive: components/card) ---------------------- */
+.card { padding: var(--s-5); background: var(--paper-2); border: 1px solid var(--rule); border-radius: var(--r-md); }
+.card h2 { margin-bottom: var(--s-3); }
+.card > :last-child { margin-bottom: 0; }
+main section + section { margin-top: var(--s-5); }
 
 /* ---- Settings ----------------------------------------------- */
-.card { padding: var(--s-5); background: var(--paper-2); border: 1px solid var(--rule); border-radius: var(--r-md); }
-.settings-block { margin-bottom: var(--s-5); }
-.settings-block h2 { margin-bottom: var(--s-3); }
-main section + section { margin-top: var(--s-5); }
 .inbox-alias { margin: var(--s-4) 0; }
 /* user-select:all lets one click select the whole address to copy it. */
 .inbox-alias code {

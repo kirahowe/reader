@@ -1,5 +1,6 @@
 (ns reader.ui.layout
-  (:require [hiccup2.core :as h]))
+  (:require [hiccup2.core :as h]
+            [reader.ui.components :as c]))
 
 (defn page
   "Wraps `body` in a complete HTML document with the standard head and
@@ -19,14 +20,6 @@
           [:script {:src "/static/js/htmx.min.js" :defer true}]]
          [:body body]])))
 
-(def book-icon
-  "The wordmark glyph: an open book."
-  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
-   [:path {:d "M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5V5.5Z"
-           :stroke "currentColor" :stroke-width "1.7" :stroke-linejoin "round"}]
-   [:path {:d "M20 5.5C20 4.7 19.3 4 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5V5.5Z"
-           :stroke "currentColor" :stroke-width "1.7" :stroke-linejoin "round"}]])
-
 (defn- nav-link [href label active? key]
   [:a (cond-> {:href href}
         (= active? key) (assoc :aria-current "page"))
@@ -40,7 +33,7 @@
   [:header.topbar
    [:div.topbar-inner
     [:a.brand {:href "/"}
-     [:span.brand-mark book-icon]
+     [:span.brand-mark c/icon-book]
      [:span.brand-word "Reader"]]
     [:nav.topnav
      (nav-link "/" "Queue" active :queue)
@@ -48,7 +41,7 @@
      (nav-link "/affiliations" "Sources" active :sources)
      (nav-link "/settings" "Settings" active :settings)
      [:form.logout {:method "post" :action "/logout"}
-      [:button {:type "submit"} "Sign out"]]]]])
+      (c/button {:type "submit" :variant :link} "Sign out")]]]])
 
 (defn app-page
   "A full page for a signed-in view: the standard document plus the app shell

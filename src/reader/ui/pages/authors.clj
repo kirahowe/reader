@@ -1,12 +1,13 @@
 (ns reader.ui.pages.authors
   "Author index and show pages."
-  (:require [reader.ui.layout :as layout]))
+  (:require [reader.ui.components :as c]
+            [reader.ui.layout :as layout]))
 
 (defn index [authors]
   (layout/app-page
    "Authors" :authors
    (list
-    [:div.page-head [:h1 "Authors"]]
+    (c/page-head "Authors")
     (if (seq authors)
       (into [:ul.entities]
             (map (fn [a]
@@ -22,7 +23,7 @@
   (layout/app-page
    (:authors/name author) :authors
    (list
-    [:nav.backnav [:a {:href "/authors"} "All authors"]]
+    (c/back-link "/authors" "All authors")
     [:h1 (:authors/name author)]
     (when-let [bio (:authors/bio author)]
       [:p bio])

@@ -1,12 +1,13 @@
 (ns reader.ui.pages.affiliations
   "The sources index — publications, newsletters, journals, and the like."
-  (:require [reader.ui.layout :as layout]))
+  (:require [reader.ui.components :as c]
+            [reader.ui.layout :as layout]))
 
 (defn index [affiliations]
   (layout/app-page
    "Sources" :sources
    (list
-    [:div.page-head [:h1 "Sources"]]
+    (c/page-head "Sources")
     (if (seq affiliations)
       (into [:ul.entities]
             (map (fn [a]

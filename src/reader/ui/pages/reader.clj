@@ -29,11 +29,6 @@
     (when (seq parts)
       (into [:div.reader-meta] parts))))
 
-(def ^:private back-icon
-  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
-   [:path {:d "M15 18l-6-6 6-6" :stroke "currentColor" :stroke-width "2"
-           :stroke-linecap "round" :stroke-linejoin "round"}]])
-
 (defn- http-url?
   "True only for http(s) URLs. This is the render boundary where a DB-sourced href
    first becomes clickable; rejecting other schemes (e.g. `javascript:`) here
@@ -62,19 +57,20 @@
       (re-find #"(?i)^mailto:" unsubscribe-url)
       [:a {:href unsubscribe-url} "Unsubscribe"])))
 
-(defn- action-form [id verb label]
+(defn- action-form [id verb label & [variant]]
   [:form {:method "post" :action (str "/queue/" id "/" verb)}
-   [:button {:type "submit"} label]])
+   (components/button (cond-> {:type "submit"} variant (assoc :variant variant)) label)])
 
 (defn- controls
-  "Read/unread toggle (by state) plus archive. Hidden for an archived item, which
-   is only reachable by a stale or hand-typed URL."
+  "Read/unread toggle (by state) plus archive. The toggle is the primary action;
+   archive stays a quiet secondary. Hidden for an archived item, which is only
+   reachable by a stale or hand-typed URL."
   [{:queue-items/keys [id state]}]
   (when (not= "archived" state)
     [:div.reader-actions
      (if (= "read" state)
-       (action-form id "unread" "Mark as unread")
-       (action-form id "read"   "Mark as read"))
+       (action-form id "unread" "Mark as unread" :primary)
+       (action-form id "read"   "Mark as read"   :primary))
      (action-form id "archive" "Archive")]))
 
 (defn show
@@ -84,11 +80,11 @@
   (layout/app-page
    (:title content) nil
    (list
-    [:nav.backnav [:a {:href "/"} [:span {:aria-hidden "true"} back-icon] "Reading list"]]
+    (components/back-link "/")
     [:article.reader
      [:div.reader-head
       (when-let [source (:source content)]
-        [:span.kicker (:name source)])
+        (components/kicker (:name source)))
       [:h1 (:title content)]
       (meta-line content)]
      (:body content)

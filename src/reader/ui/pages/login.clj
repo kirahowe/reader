@@ -3,6 +3,7 @@
    principle 15) runs the passkey/passcode flow and sets the `hanko` session
    cookie; on session creation we redirect to the reading list."
   (:require [hiccup2.core :as h]
+            [reader.ui.components :as c]
             [reader.ui.layout :as layout]))
 
 (defn- hanko-island [api-url]
@@ -22,7 +23,7 @@
    [:main.login-main
     [:div.login-card
      [:a.brand.brand-lg {:href "/"}
-      [:span.brand-mark layout/book-icon]
+      [:span.brand-mark c/icon-book]
       [:span.brand-word "Reader"]]
      [:h1 "Welcome back"]
      [:p.muted.login-tag "Your calm queue for articles, papers, and newsletters."]

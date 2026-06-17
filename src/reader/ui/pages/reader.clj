@@ -20,14 +20,19 @@
         (if (>= (count s) 10) (subs s 0 10) s)))))
 
 (defn- meta-line
-  "Source, byline, and date under the title, each shown only when present."
-  [{:keys [source authors date]}]
-  (let [source-frag (when source [:span (:name source)])
-        byline-frag (components/byline authors)
-        date-frag   (when date [:span (format-date date)])
-        parts       (remove nil? [source-frag byline-frag date-frag])]
+  "Byline and date under the title, each shown only when present. The source is
+   promoted to the kicker above the title, so it is not repeated here."
+  [{:keys [authors date]}]
+  (let [byline-frag (when-let [b (components/byline authors)] [:span.meta-item b])
+        date-frag   (when date [:span.meta-item (format-date date)])
+        parts       (remove nil? [byline-frag date-frag])]
     (when (seq parts)
-      (into [:div.reader-meta.muted] (interpose " · " parts)))))
+      (into [:div.reader-meta] parts))))
+
+(def ^:private back-icon
+  [:svg {:viewBox "0 0 24 24" :fill "none" :aria-hidden "true"}
+   [:path {:d "M15 18l-6-6 6-6" :stroke "currentColor" :stroke-width "2"
+           :stroke-linecap "round" :stroke-linejoin "round"}]])
 
 (defn- http-url?
   "True only for http(s) URLs. This is the render boundary where a DB-sourced href
@@ -76,15 +81,18 @@
   "`queue-item` is the raw queue_items row (for state/controls); `content` is the
    uniform map from `reader.extract`."
   [queue-item content]
-  (layout/page
-   (:title content)
-   [:main
-    [:nav.index-nav.muted [:a {:href "/"} "Back to your reading list"]]
+  (layout/app-page
+   (:title content) nil
+   (list
+    [:nav.backnav [:a {:href "/"} [:span {:aria-hidden "true"} back-icon] "Reading list"]]
     [:article.reader
-     [:h1 (:title content)]
-     (meta-line content)
+     [:div.reader-head
+      (when-let [source (:source content)]
+        [:span.kicker (:name source)])
+      [:h1 (:title content)]
+      (meta-line content)]
      (:body content)
      (links-line (:links content))
      (controls queue-item)
      (when-let [unsub (unsubscribe-link content)]
-       [:p.reader-unsubscribe unsub])]]))
+       [:p.reader-unsubscribe unsub])])))

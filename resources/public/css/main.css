@@ -1,257 +1,454 @@
+/* ============================================================
+   Reading Room — a calm, bookish, editorial reading queue.
+   Warm paper, serif headlines, a single deep-green accent, and
+   sharp modern corners. Tokens live in tokens.css.
+   ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
-
 html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   font-family: var(--font-ui);
-  background: var(--bg);
-  color: var(--fg);
-  line-height: 1.5;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.55;
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
-}
-
-main {
-  max-width: var(--measure);
-  margin-inline: auto;
-  padding: var(--space-5) var(--space-4);
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3 {
   font-family: var(--font-prose);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  margin: 0 0 var(--space-3);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.15;
+  margin: 0 0 var(--s-4);
+  color: var(--ink);
 }
-
-h1 { font-size: 2rem; }
+h1 { font-size: clamp(1.8rem, 1.3rem + 1.8vw, 2.4rem); }
 h2 { font-size: 1.25rem; }
+h3 { font-size: 1.1rem; }
+p { margin: 0 0 var(--s-4); }
 
-p { margin: 0 0 var(--space-3); }
-
-/* Links look like links — underlined in their own colour, warming to the
-   accent on hover, rather than a loud blue. */
-a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-  text-decoration-thickness: 1px;
-  transition: color 0.15s;
-}
+a { color: inherit; text-decoration: none; transition: color .15s; }
 a:hover { color: var(--accent); }
 
-hr { border: 0; border-top: 1px solid var(--rule); margin: var(--space-4) 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: var(--s-6) 0; }
 
 /* A single, consistent keyboard-focus ring everywhere. */
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* Buttons. The bare element is a quiet secondary control; `.primary`-style
-   form submits fill with the accent. Inline list actions are restyled to
-   read as text (see .readable-actions) while staying real, focusable buttons. */
-button {
-  font: inherit;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-button:hover { border-color: var(--fg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
 
 .muted { color: var(--muted); }
 
-/* Index navigation: the subtle cross-links between list pages. */
-.index-nav { font-size: 0.875rem; margin-bottom: var(--space-5); }
-
-/* Sign-out is a POST, so a real <button>, but it sits inline among the nav
-   links and is dressed to read as one of them (underlined, accent on hover). */
-.index-nav .logout { display: inline; }
-.index-nav .logout button {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-  text-decoration-thickness: 1px;
+/* ---- Buttons -------------------------------------------------
+   The bare element is a quiet secondary control; primary actions
+   (form submits, the reader's first action) fill with the accent. */
+button {
+  font: inherit;
+  font-weight: 500;
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s, box-shadow .15s, transform .05s;
 }
-.index-nav .logout button:hover { border-color: transparent; color: var(--accent); }
+button:hover { border-color: var(--ink-soft); }
+button:active { transform: translateY(0.5px); }
 
-/* Reading list */
-.readables, .entities { list-style: none; padding: 0; margin: 0; }
-
-.readable {
+/* ---- Top bar / app shell ------------------------------------
+   A sticky, translucent masthead with the wordmark and the primary
+   nav. Shared across every signed-in page (reader.ui.layout/app-page). */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.topbar-inner {
+  max-width: var(--feed);
+  margin-inline: auto;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--rule);
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-5);
 }
-.readable:first-child { border-top: 0; padding-top: 0; }
-
-.readable-text { flex: 1; min-width: 0; }
-
-.readable-title {
-  font-family: var(--font-prose);
-  font-size: 1.25rem;
-  line-height: 1.3;
-}
-
-.readable-meta { font-size: 0.875rem; margin-top: var(--space-1); }
-.queue-state { text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.75rem; }
-
-/* The row action is a real, focusable <button> dressed down to a quiet icon. */
-.readable-actions { flex-shrink: 0; }
-.readable-actions button {
+.brand {
   display: inline-flex;
-  padding: var(--space-1);
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-prose);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
-.readable-actions button:hover { background: transparent; color: var(--accent); }
-.readable-actions svg { display: block; width: 1.125rem; height: 1.125rem; }
+.brand:hover { color: var(--ink); }
+.brand-mark { display: inline-flex; color: var(--accent); }
+.brand-mark svg { width: 1.25rem; height: 1.25rem; }
+.topnav { display: flex; align-items: center; gap: var(--s-5); font-size: 0.9rem; font-weight: 500; }
+.topnav a { color: var(--muted); padding: 0.2rem 0; border-bottom: 2px solid transparent; }
+.topnav a:hover { color: var(--ink); }
+.topnav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+/* Sign-out is a POST, so a real <button>, dressed to read as a nav link. */
+.logout { display: inline-flex; }
+.logout button { padding: 0; border: 0; background: none; color: var(--muted); font-weight: 500; }
+.logout button:hover { color: var(--accent); border-color: transparent; }
 
-/* Entity indexes (authors, sources) */
-.entities li { padding: var(--space-3) 0; border-top: 1px solid var(--rule); }
-.entities li:first-child { border-top: 0; padding-top: 0; }
-
-/* Forms */
-.form { max-width: 32rem; }
-.form label { display: block; margin-bottom: var(--space-4); }
-.form .label-text {
-  display: block;
-  margin-bottom: var(--space-1);
-  font-size: 0.875rem;
-  color: var(--muted);
+main {
+  max-width: var(--feed);
+  margin-inline: auto;
+  padding: var(--s-6) var(--s-5) var(--s-7);
 }
-.form input, .form textarea, .form select {
-  font: inherit;
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--bg);
-  color: inherit;
-}
-/* Focus shows the accent border on any focus, but the outline is only dropped
-   for non-keyboard focus — keyboard users keep the global :focus-visible ring. */
-.form input:focus, .form textarea:focus, .form select:focus { border-color: var(--accent); }
-.form input:focus:not(:focus-visible),
-.form textarea:focus:not(:focus-visible),
-.form select:focus:not(:focus-visible) { outline: none; }
-.form textarea { min-height: 6rem; resize: vertical; }
-.form .error { color: var(--accent); font-size: 0.875rem; margin-top: var(--space-1); }
 
-.form button[type="submit"] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
-}
-.form button[type="submit"]:hover { filter: brightness(1.08); border-color: var(--accent); }
-
-/* Reader view */
-.reader-meta { font-size: 0.875rem; margin-bottom: var(--space-4); }
-
-.reader .prose { font-family: var(--font-prose); font-size: 1.125rem; line-height: 1.7; }
-.reader .prose > * + * { margin-top: var(--space-3); }
-.reader .prose h2, .reader .prose h3 { margin-top: var(--space-4); margin-bottom: var(--space-2); }
-.reader .prose blockquote {
-  margin: var(--space-3) 0;
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--rule);
-  color: var(--muted);
-}
-.reader .prose .lead { font-size: 1.15rem; }
-.reader .prose .placeholder { font-style: italic; }
-
-/* External links (DOI, arXiv, the original) get a trailing ↗. */
-.reader-links { font-size: 0.9375rem; margin-top: var(--space-4); }
-.external::after { content: " ↗"; }
-
-.reader-actions {
+/* ---- Page head ---------------------------------------------- */
+.page-head {
   display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--rule);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
 }
+.page-head h1 { margin: 0; }
+.page-sub { margin: var(--s-2) 0 0; font-size: 0.9rem; }
+.ghost-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+.ghost-link:hover { background: var(--accent-tint); border-color: var(--accent-2); color: var(--accent); }
 
-/* URL ingest: the add-by-URL form and the import placeholder rows. */
-.add-url { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); }
+/* ---- Back nav (reader, sub-pages) --------------------------- */
+.backnav { margin-bottom: var(--s-5); font-size: 0.875rem; }
+.backnav a { display: inline-flex; align-items: center; gap: var(--s-1); color: var(--muted); font-weight: 500; }
+.backnav a:hover { color: var(--accent); }
+.backnav svg { width: 1rem; height: 1rem; }
+
+/* ---- Add-by-URL bar ----------------------------------------- */
+.add-url {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-6);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+}
+.add-url-icon { color: var(--muted); font-size: 1.2rem; font-weight: 300; line-height: 1; }
 .add-url input[type="url"] {
   font: inherit;
   flex: 1;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--bg);
+  padding: var(--s-3) var(--s-2);
+  border: 0;
+  background: transparent;
   color: inherit;
 }
-.add-url input:focus { border-color: var(--accent); }
-.add-url input:focus:not(:focus-visible) { outline: none; }
+.add-url input::placeholder { color: var(--muted); }
+.add-url input:focus { outline: none; }
 .add-url button[type="submit"] {
-  border-color: var(--accent);
+  border: 0;
   background: var(--accent);
-  color: var(--bg);
+  color: #fff;
+  font-weight: 600;
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-sm);
 }
-.add-url button[type="submit"]:hover { filter: brightness(1.08); border-color: var(--accent); }
+.add-url button[type="submit"]:hover { filter: brightness(1.07); }
+@media (prefers-color-scheme: dark) { .add-url button[type="submit"] { color: #10201b; } }
 
-/* An importing row is dimmed while it polls; a failed one flags itself in the
-   accent colour — the same cue the forms use for errors. */
-.readable.importing { opacity: 0.65; }
-.readable.failed .readable-title { color: var(--accent); }
-.import-url { overflow-wrap: anywhere; }
+/* ---- The reading list --------------------------------------- */
+.readables, .entities { list-style: none; padding: 0; margin: 0; }
+
+.readable {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-4);
+  margin-inline: calc(-1 * var(--s-4));
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  position: relative;
+  transition: background .15s, box-shadow .15s;
+}
+/* A hairline between rows, drawn as an inset pseudo-element so it can
+   vanish cleanly around the hovered (raised) row. */
+.readable::after {
+  content: "";
+  position: absolute;
+  left: var(--s-4); right: var(--s-4); bottom: 0;
+  border-bottom: 1px solid var(--rule);
+}
+.readable:last-child::after { display: none; }
+.readable:hover { background: var(--paper-2); box-shadow: var(--shadow-sm); }
+.readable:hover::after, .readable:hover + .readable::after { border-color: transparent; }
+
+.readable-text { flex: 1; min-width: 0; }
+.readable-title {
+  font-family: var(--font-prose);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+}
+.readable-title a { color: inherit; }
+.readable:hover .readable-title a { color: var(--accent); }
+
+.readable-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-3);
+  font-size: 0.8125rem;
+  margin-top: var(--s-2);
+  color: var(--muted);
+}
+/* CSS owns the separators, so the markup stays clean (no literal dots). */
+.meta-item + .meta-item::before { content: "·"; margin-right: var(--s-3); color: var(--rule-2); }
+.meta-source { color: var(--ink-soft); font-weight: 500; }
+.readable-meta a { color: var(--ink-soft); }
+.readable-meta a:hover { color: var(--accent); }
+
+.queue-state {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.22em 0.5em;
+  border-radius: var(--r-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+  line-height: 1.5;
+}
+.state-read { background: transparent; color: var(--muted); border: 1px solid var(--rule-2); }
+.state-reading { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
+
+/* The row action: a quiet icon button that only surfaces on hover. */
+.readable-actions { flex-shrink: 0; }
+.readable-actions button {
+  display: inline-flex;
+  padding: var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity .15s, background .15s, color .15s;
+}
+.readable:hover .readable-actions button { opacity: 1; }
+.readable-actions button:hover { background: var(--rule); color: var(--gold); }
+.readable-actions svg { display: block; width: 1.1rem; height: 1.1rem; }
+
+/* Importing / failed states */
+.readable.importing .readable-title {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.readable.failed .readable-title { color: var(--gold); }
+.import-url { overflow-wrap: anywhere; font-family: var(--font-ui); }
 
 .spinner {
   display: inline-block;
-  width: 0.8em;
-  height: 0.8em;
-  border: 2px solid currentColor;
+  width: 0.85em; height: 0.85em;
+  border: 2px solid var(--accent);
   border-right-color: transparent;
   border-radius: 50%;
   vertical-align: -0.1em;
+  margin-right: 0.35em;
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Extraction eval dashboard */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--space-3);
-  margin: 0;
+/* ---- Entity indexes (authors, sources) ---------------------- */
+.entities li {
+  padding: var(--s-4) var(--s-2);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-prose);
+  font-size: 1.15rem;
 }
-.stats dt { font-size: 0.8125rem; color: var(--muted); }
-.stats dd { margin: 0; font-family: var(--font-prose); font-size: 1.5rem; }
+.entities li:first-child { border-top: 0; }
+.entities li a { color: var(--ink); }
+.entities li a:hover { color: var(--accent); }
+.entities .entity-type { font-family: var(--font-ui); font-size: 0.8125rem; color: var(--muted); }
 
+/* ---- Forms -------------------------------------------------- */
+.form { max-width: 32rem; }
+.form label { display: block; margin-bottom: var(--s-5); }
+.form .label-text { display: block; margin-bottom: var(--s-2); font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+.form input, .form textarea, .form select {
+  font: inherit;
+  width: 100%;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+.form input:focus, .form textarea:focus, .form select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.form input:focus:not(:focus-visible),
+.form textarea:focus:not(:focus-visible),
+.form select:focus:not(:focus-visible) { outline: none; }
+.form textarea { min-height: 7rem; resize: vertical; }
+.form .error { color: var(--gold); font-size: 0.8125rem; margin-top: var(--s-1); }
+.form button[type="submit"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  padding-inline: var(--s-5);
+}
+.form button[type="submit"]:hover { filter: brightness(1.07); border-color: var(--accent); }
+@media (prefers-color-scheme: dark) { .form button[type="submit"] { color: #10201b; } }
+
+/* ---- Reader view -------------------------------------------- */
+.reader { max-width: var(--measure); margin-inline: auto; }
+.reader-head { margin-bottom: var(--s-6); padding-bottom: var(--s-5); border-bottom: 1px solid var(--rule); }
+.kicker {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: var(--s-3);
+}
+.reader-head h1 { margin: 0 0 var(--s-4); font-size: clamp(2rem, 1.4rem + 2.4vw, 2.9rem); line-height: 1.1; }
+.reader-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-3);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.reader-meta .meta-item + .meta-item::before { content: "·"; margin-right: var(--s-3); color: var(--rule-2); }
+.reader-meta a { color: var(--ink-soft); }
+.reader-meta a:hover { color: var(--accent); }
+
+.reader .prose { font-family: var(--font-prose); font-size: 1.2rem; line-height: 1.75; color: var(--ink-soft); }
+.reader .prose > * + * { margin-top: var(--s-5); }
+.reader .prose h2, .reader .prose h3 { color: var(--ink); margin-top: var(--s-6); margin-bottom: var(--s-3); }
+.reader .prose blockquote {
+  margin: var(--s-5) 0;
+  padding: var(--s-1) 0 var(--s-1) var(--s-5);
+  border-left: 3px solid var(--accent-2);
+  color: var(--ink);
+  font-style: italic;
+  font-size: 1.25rem;
+}
+.reader .prose .lead { font-size: 1.35rem; line-height: 1.6; color: var(--ink); }
+/* A drop cap opens the piece — the editorial flourish that sets the tone. */
+.reader .prose .lead::first-letter {
+  initial-letter: 3;
+  -webkit-initial-letter: 3;
+  font-weight: 700;
+  margin-right: 0.6rem;
+  color: var(--accent);
+}
+.reader .prose .placeholder { font-style: italic; }
+
+/* External links (DOI, arXiv, the original) get a trailing ↗. */
+.reader-links { display: flex; flex-wrap: wrap; gap: var(--s-4); font-size: 0.9375rem; margin-top: var(--s-6); }
+.reader-links a { color: var(--accent); font-weight: 500; }
+.external::after { content: " ↗"; opacity: 0.6; }
+.reader-unsubscribe { font-size: 0.875rem; margin-top: var(--s-3); }
+
+.reader-actions {
+  display: flex;
+  gap: var(--s-3);
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--rule);
+}
+.reader-actions button { font-weight: 500; }
+.reader-actions form:first-child button { border-color: var(--accent); background: var(--accent); color: #fff; }
+.reader-actions form:first-child button:hover { filter: brightness(1.07); }
+@media (prefers-color-scheme: dark) { .reader-actions form:first-child button { color: #10201b; } }
+
+/* ---- Login -------------------------------------------------- */
+.login-main { display: flex; min-height: 100vh; align-items: center; justify-content: center; max-width: none; padding: var(--s-5); }
+.login-card { width: 100%; max-width: 24rem; text-align: center; }
+.brand-lg { font-size: 1.6rem; justify-content: center; margin-bottom: var(--s-6); }
+.brand-lg .brand-mark svg { width: 1.7rem; height: 1.7rem; }
+.login-card h1 { font-size: 2rem; margin-bottom: var(--s-2); }
+.login-tag { margin-bottom: var(--s-6); }
+/* The Hanko web component renders the actual fields; we frame it in a card
+   and pass it a few theme variables so it inherits the palette. */
+.login-card hanko-auth {
+  display: block;
+  text-align: left;
+  padding: var(--s-6);
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  --color: var(--ink);
+  --color-shade-1: var(--muted);
+  --color-shade-2: var(--rule-2);
+  --brand-color: var(--accent);
+  --brand-color-shade-1: var(--accent);
+  --background-color: var(--paper-2);
+  --font-family: var(--font-ui);
+  --border-radius: var(--r-sm);
+  --button-border-radius: var(--r-sm);
+  --input-border-radius: var(--r-sm);
+}
+
+/* ---- Settings ----------------------------------------------- */
+.card { padding: var(--s-5); background: var(--paper-2); border: 1px solid var(--rule); border-radius: var(--r-md); }
+.settings-block { margin-bottom: var(--s-5); }
+.settings-block h2 { margin-bottom: var(--s-3); }
+main section + section { margin-top: var(--s-5); }
+.inbox-alias { margin: var(--s-4) 0; }
+/* user-select:all lets one click select the whole address to copy it. */
+.inbox-alias code {
+  display: inline-block;
+  font-size: 1.0625rem;
+  padding: var(--s-3) var(--s-4);
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  user-select: all;
+}
+.inbox-pending { font-size: 0.875rem; }
+
+/* ---- Extraction eval dashboard ------------------------------ */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--s-4); margin: 0; }
+.stats dt { font-size: 0.8125rem; color: var(--muted); }
+.stats dd { margin: 0; font-family: var(--font-prose); font-size: 1.6rem; }
 table.eval { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
 table.eval th, table.eval td {
   text-align: left;
-  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  padding: var(--s-3) var(--s-4) var(--s-3) 0;
   border-bottom: 1px solid var(--rule);
   font-weight: 400;
 }
 table.eval thead th { color: var(--muted); }
-.sources { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.sources { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .sources .source { font-size: 0.8125rem; color: var(--muted); }
 
-main section + section { margin-top: var(--space-5); }
-
-/* Settings — the inbound newsletter alias. user-select:all lets one click
-   select the whole address, so it's easy to copy without any JS. */
-.inbox-alias { margin: var(--space-3) 0; }
-.inbox-alias code {
-  display: inline-block;
-  font-size: 1.0625rem;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  user-select: all;
+/* ---- Responsive --------------------------------------------- */
+@media (max-width: 560px) {
+  .topbar-inner { padding: var(--s-3) var(--s-4); }
+  .topnav { gap: var(--s-4); font-size: 0.85rem; }
+  .brand-word { display: none; }
+  main { padding: var(--s-5) var(--s-4); }
+  .page-head { flex-direction: column; align-items: flex-start; gap: var(--s-3); }
+  .readable-actions button { opacity: 1; }
 }
-.inbox-pending { font-size: 0.875rem; }

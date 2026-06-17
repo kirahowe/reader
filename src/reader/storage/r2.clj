@@ -10,7 +10,11 @@
             [reader.storage :as storage])
   (:import (java.io InputStream)))
 
-(defn- s3-client [{:keys [account-id access-key secret region] :or {region "auto"}}]
+;; aws-api resolves the region's S3 endpoint *before* applying :endpoint-override,
+;; so the region must be one it knows. R2's documented "auto" isn't, and yields
+;; "No known endpoint." us-east-1 resolves, the override then points the request
+;; at R2, and R2 accepts SigV4 signed for us-east-1.
+(defn- s3-client [{:keys [account-id access-key secret region] :or {region "us-east-1"}}]
   (aws/client {:api                   :s3
                :region                region
                :endpoint-override     {:protocol :https
@@ -43,7 +47,7 @@
 
 (defn ->store
   "An R2-backed Blobs store. `cfg` needs :account-id :bucket :access-key :secret;
-   :region defaults to R2's \"auto\". When credentials are absent it returns a
+   :region defaults to us-east-1 (see s3-client). When credentials are absent it returns a
    disabled store (boots, throws on use) rather than failing startup — R2 is an
    optional feature (inbound email), so a half-configured prod still serves
    everything else; inbound email activates once the secrets are set."

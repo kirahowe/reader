@@ -18,6 +18,10 @@ name = "miscellany-inbound"
 main = "email-worker.js"
 compatibility_date = "2026-06-01"
 
+# This worker is invoked only by Email Routing (an email() handler, no fetch
+# route), so don't publish it on *.workers.dev — keep it off the public HTTP edge.
+workers_dev = false
+
 # The R2 bucket the raw .eml files are written to (created in the dashboard).
 [[r2_buckets]]
 binding = "INBOUND_BUCKET"
@@ -26,5 +30,20 @@ bucket_name = "miscellany-inbound"
 [vars]
 # The app's public origin, where the signed notification is POSTed.
 READER_API_URL = "https://themiscellany.app"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
 
 # INBOUND_HMAC_SECRET is a secret, not a var — set it with `wrangler secret put`.

@@ -77,6 +77,9 @@
  ;; :ingest-email job handler. `storage` is supplied per-environment (the R2
  ;; client in prod, the in-memory stub in dev/test) where that component exists.
  :reader.ingest/ingest-email-handler {}
+ ;; :extract-paper job handler. Fetches the OpenAlex graph + arXiv HTML body over
+ ;; the network (free APIs, no config) and upserts the canonical entity graph.
+ :reader.papers/extract-paper-handler {}
 
  ;; Auth. jwks-url, issuer, api-url, allowed-emails, and the CSRF site-origin
  ;; are environment-specific and supplied by the dev/test/prod profiles.

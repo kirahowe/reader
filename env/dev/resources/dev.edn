@@ -35,7 +35,8 @@
  ;; Background worker draining the ingest jobs (manual URL + inbound email).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
                       :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler
-                                          "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler}
+                                          "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler
+                                          "extract-paper"   #ig/ref :reader.papers/extract-paper-handler}
                       :poll-ms           1000
                       :max-attempts      5
                       :backoff-base-secs 10}

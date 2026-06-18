@@ -5,7 +5,6 @@
    scripts and the source stylesheet/classes so the body reflows under our own
    prose CSS (mobile-friendly, unlike an embedded PDF). The fetch fn is injected;
    sanitization is pure."
-  (:require [clojure.string :as str])
   (:import (org.jsoup Jsoup)
            (org.jsoup.safety Safelist)))
 

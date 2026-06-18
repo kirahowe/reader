@@ -115,12 +115,16 @@
    non-fatally so the worker retries — OpenAlex may not have indexed a brand-new
    paper yet. Payload ids arrive as strings (jsonb drops uuid + keyword types), so
    `:paper-id` is parsed and `:kind` re-keyworded."
-  [ds {:keys [paper-id kind id]} {:keys [openalex-fetch body-fetch]}]
+  [ds {:keys [paper-id kind id]} {:keys [openalex-fetch body-fetch meta-fetch]}]
   (let [ref   {:kind (keyword kind) :id id}
-        graph (openalex/fetch openalex-fetch ref)
+        ;; OpenAlex first (the rich graph); for an arXiv paper it doesn't have
+        ;; (the back catalog), fall back to the arXiv API for names-only metadata.
+        graph (or (openalex/fetch openalex-fetch ref)
+                  (when (and meta-fetch (= :arxiv (:kind ref)))
+                    (arxiv/fetch-metadata meta-fetch id)))
         body  (when (= :arxiv (:kind ref)) (arxiv/fetch-body body-fetch id))]
     (when-not graph
-      (throw (ex-info "no OpenAlex record for paper (yet)"
+      (throw (ex-info "no metadata for paper (yet)"
                       {:ref ref :error-class :paper-not-found})))
     (jdbc/with-transaction [tx ds]
       (finalize! tx (parse-uuid (str paper-id)) ref graph body))))
@@ -128,7 +132,8 @@
 (defmethod ig/init-key :reader.papers/extract-paper-handler [_ _]
   (fn [ds payload]
     (extract-paper! ds payload {:openalex-fetch openalex/http-get
-                                :body-fetch     openalex/http-get})))
+                                :body-fetch     openalex/http-get
+                                :meta-fetch     openalex/http-get})))
 
 ;; ── entry point + status (placeholder/poll flow) ─────────────────────────
 

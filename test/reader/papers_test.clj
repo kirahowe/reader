@@ -108,3 +108,36 @@
         (let [vaswani (crud/find-1 ds :authors {:orcid orcid})]
           (is (= 2 (count (crud/find-many ds :authorships {:readable-id pid}))))
           (is (= 1 (count (crud/find-many ds :author-affiliations {:author-id (:authors/id vaswani)})))))))))
+
+(def ^:private arxiv-atom
+  "<feed xmlns=\"http://www.w3.org/2005/Atom\"><entry>
+     <title>Attention Is All You Need</title>
+     <summary>We propose the Transformer.</summary>
+     <published>2017-06-12T17:57:34Z</published>
+     <author><name>Ashish Vaswani</name></author>
+     <author><name>Noam Shazeer</name></author>
+   </entry></feed>")
+
+(deftest extract-falls-back-to-arxiv-api-when-openalex-misses
+  (with-system [system]
+    (let [ds              (:reader.db/datasource system)
+          uid             (mk-user ds "fb@example.com")
+          {:keys [paper]} (papers/start! ds uid {:kind :arxiv :id "1706.03762"})
+          pid             (:papers/id paper)]
+      (papers/extract-paper! ds {:paper-id pid :kind "arxiv" :id "1706.03762"}
+                             {:openalex-fetch (constantly nil)
+                              :meta-fetch     (constantly arxiv-atom)
+                              :body-fetch     (constantly "<p>body</p>")})
+      (let [p      (crud/by-id ds :papers pid)
+            aships (sort-by :authorships/ordinal (crud/find-many ds :authorships {:readable-id pid}))]
+        (testing "the paper is filled from the arXiv API (title/abstract/body/venue)"
+          (is (= "Attention Is All You Need" (:papers/title p)))
+          (is (= "We propose the Transformer." (:papers/abstract p)))
+          (is (str/includes? (:papers/body-html p) "body"))
+          (is (= "preprint" (:affiliations/type (crud/by-id ds :affiliations (:papers/affiliation-id p))))))
+        (testing "authors land as names only — no ORCID, no institution links"
+          (is (= 2 (count aships)))
+          (let [a0 (crud/by-id ds :authors (:authorships/author-id (first aships)))]
+            (is (= "Ashish Vaswani" (:authors/name a0)))
+            (is (nil? (:authors/orcid a0)))
+            (is (empty? (crud/find-many ds :author-affiliations {:author-id (:authors/id a0)})))))))))

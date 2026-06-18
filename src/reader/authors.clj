@@ -106,12 +106,13 @@
 (defn affiliations-of
   "The outlets `author-id` writes for, joined to the affiliation rows and
    flattened to {:name :slug :type :role :primary?}, primary first then by
-   name. Two small reads joined in Clojure — keeps the result-set builder
-   off a multi-table join."
+   name. Two small reads joined in Clojure — keeps the result-set builder off a
+   multi-table join — fetching only the affiliations this author links to."
   [ds author-id]
-  (let [affs (into {} (map (juxt :affiliations/id identity))
-                   (crud/find-many ds :affiliations))]
-    (->> (crud/find-many ds :author-affiliations {:author-id author-id})
+  (let [links (crud/find-many ds :author-affiliations {:author-id author-id})
+        affs  (into {} (map (juxt :affiliations/id identity))
+                    (crud/find-in ds :affiliations :id (map :author-affiliations/affiliation-id links)))]
+    (->> links
          (map (fn [link]
                 (let [a (get affs (:author-affiliations/affiliation-id link))]
                   {:name     (:affiliations/name a)

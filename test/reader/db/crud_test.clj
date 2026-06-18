@@ -183,3 +183,18 @@
         (is (= (:queue-items/id row)
                (:queue-items/id (crud/find-1 ds :queue-items {:via via})))
             "a map in the where clause must bind as jsonb, not parse as a HoneySQL fragment")))))
+
+(deftest create-ignore!-test
+  (with-system [system]
+    (let [ds (:reader.db/datasource system)]
+      (testing "inserts and returns the row when there's no conflict"
+        (let [row (crud/create-ignore! ds :authors {:name "Grace Hopper" :slug "ci-grace"})]
+          (is (some? row))
+          (is (= "Grace Hopper" (:authors/name row)))))
+
+      (testing "returns nil (no throw) when it collides on a unique constraint"
+        (crud/create! ds :authors {:name "First" :slug "ci-dup"})
+        ;; A plain create! here would raise a unique violation and abort the tx;
+        ;; create-ignore! lets resolve-entity! treat a lost race as a re-resolve.
+        (is (nil? (crud/create-ignore! ds :authors {:name "Second" :slug "ci-dup"})))
+        (is (= 1 (count (crud/find-many ds :authors {:slug "ci-dup"}))) "no second row written")))))

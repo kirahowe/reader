@@ -77,6 +77,20 @@
                                   :returning   [:*]})
                      opts))
 
+(defn create-ignore!
+  "Insert `attrs`, returning the new row — or nil if it collided with an existing
+   row on any unique constraint (`ON CONFLICT DO NOTHING`). Lets a caller treat a
+   lost insert race as \"someone else just created it\" and re-resolve, instead of
+   aborting the transaction on the unique violation a plain `create!` would raise."
+  [ds table attrs]
+  (jdbc/execute-one! ds
+                     (sql/format {:insert-into [table]
+                                  :values      [(encode-values attrs)]
+                                  :on-conflict []
+                                  :do-nothing  []
+                                  :returning   [:*]})
+                     opts))
+
 (defn upsert!
   "Insert `attrs`; if it collides on the unique `conflict-cols`, update the
    existing row with `update-set` instead of erroring. Returns the inserted
@@ -142,21 +156,33 @@
    non-nil value for an id-key) — distinct entities that share a name don't
    merge. On a match, fills columns that are nil on the row from attrs (never
    clobbering) and returns it; on no match, inserts, disambiguating `slug-key`
-   (suffix) when taken. Runs several statements — pass a transaction for
-   atomicity."
+   (suffix) when taken.
+
+   Race-safe across concurrent workers: the insert is `ON CONFLICT DO NOTHING`,
+   so if another worker created the same entity in the gap between our lookup and
+   our insert, we re-resolve (the row now exists) rather than aborting on the
+   unique violation. Runs several statements — pass a transaction for atomicity."
   [ds table {:keys [id-keys slug-key attrs]}]
   (let [q          (name table)
-        by-id      (some (fn [k] (when-let [v (get attrs k)] (find-1 ds table {k v}))) id-keys)
-        slug-row   (when-let [s (get attrs slug-key)] (find-1 ds table {slug-key s}))
         conflicts? (fn [row]
                      (boolean (some (fn [k]
                                       (let [ours (get attrs k) theirs (get row (keyword q (name k)))]
                                         (and ours theirs (not= ours theirs))))
                                     id-keys)))
-        match      (or by-id (when (and slug-row (not (conflicts? slug-row))) slug-row))]
-    (if match
-      (let [fills (blank-fills q match attrs)]
-        (if (seq fills)
-          (update! ds table (get match (keyword q "id")) (assoc fills :updated-at (java.time.Instant/now)))
-          match))
-      (create! ds table (assoc attrs slug-key (free-slug ds table slug-key (get attrs slug-key)))))))
+        find-match (fn []
+                     (let [by-id    (some (fn [k] (when-let [v (get attrs k)] (find-1 ds table {k v}))) id-keys)
+                           slug-row (when-let [s (get attrs slug-key)] (find-1 ds table {slug-key s}))]
+                       (or by-id (when (and slug-row (not (conflicts? slug-row))) slug-row))))]
+    (loop [attempt 0]
+      (if-let [match (find-match)]
+        (let [fills (blank-fills q match attrs)]
+          (if (seq fills)
+            (update! ds table (get match (keyword q "id")) (assoc fills :updated-at (java.time.Instant/now)))
+            match))
+        (or (create-ignore! ds table (assoc attrs slug-key (free-slug ds table slug-key (get attrs slug-key))))
+            ;; Lost the insert race: the row now exists (or its slug is now taken),
+            ;; so loop to find/disambiguate it. Bounded — a persistent miss is a bug.
+            (if (< attempt 3)
+              (recur (inc attempt))
+              (throw (ex-info "resolve-entity! did not converge"
+                              {:table table :attrs attrs}))))))))

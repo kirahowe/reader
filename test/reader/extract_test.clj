@@ -65,6 +65,19 @@
                        {:item {:type :paper :title "Bare" :source nil :authors []}
                         :row  {:papers/abstract nil :papers/doi nil :papers/arxiv-id nil}}))))))
 
+(deftest extract-paper-renders-stored-body-test
+  (testing "once extracted, the paper's reflowable body is rendered raw (MathML and all) over the abstract"
+    (let [out      (extract/extract
+                    {:item {:type :paper :title "Attention" :source nil :authors []}
+                     :row  {:papers/body-html "<p>The reflowed body <math><mi>x</mi></math> here.</p>"
+                            :papers/abstract  "an abstract that should be ignored now"
+                            :papers/doi nil :papers/arxiv-id nil}})
+          rendered (str (h/html (:body out)))]
+      (is (re-find #"The reflowed body" rendered))
+      (is (re-find #"<math" rendered) "MathML survives to the reader so equations render")
+      (is (not (re-find #"abstract that should be ignored" rendered)))
+      (is (not (re-find #"(?i)not available in the reader" rendered))))))
+
 (deftest extract-newsletter-test
   (let [out      (extract/extract
                   {:item {:type :newsletter-issue :title "ACT links for the week"

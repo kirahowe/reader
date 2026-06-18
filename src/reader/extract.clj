@@ -4,14 +4,14 @@
    {:title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.
 
-   Article and newsletter-issue bodies render the stored HTML produced by
+   Article, paper, and newsletter-issue bodies render the stored HTML produced by
    ingest, which sanitizes with jsoup at the ingest boundary
-   (reader.ingest.extract for articles, reader.ingest.email for newsletters) —
-   so the stored body_html is trusted and rendered raw here. Until an article
-   has been extracted (body_html is still null), and for papers, the body is a
-   *placeholder* while the real fields (title / byline / source / date / links)
-   come from what we already store. Paper PDF rendering lands with its own
-   ingest path."
+   (reader.ingest.extract for articles, reader.ingest.email for newsletters,
+   reader.papers.arxiv for papers — a MathML-aware Safelist so equations reflow) —
+   so the stored body_html is trusted and rendered raw here. When the body is
+   still null (an article being fetched, or a paper with no HTML source such as a
+   DOI-only record), the body is a *placeholder* previewing the abstract while the
+   real fields (title / byline / source / date / links) come from what we store."
   (:require [hiccup.util :as hu]))
 
 (defn- placeholder-body
@@ -41,6 +41,16 @@
     [:div.prose (hu/raw-string html)]
     (placeholder-body nil)))
 
+(defn- paper-body
+  "A paper's reflowable body — the arXiv HTML sanitized at ingest with a
+   MathML-aware Safelist (reader.papers.arxiv), so it's trusted and rendered raw —
+   otherwise a placeholder previewing the abstract (a paper with no HTML source,
+   e.g. a DOI-only record)."
+  [row]
+  (if-let [html (not-empty (:papers/body-html row))]
+    [:div.prose (hu/raw-string html)]
+    (placeholder-body (:papers/abstract row))))
+
 (defn- common
   "The type-independent fields, taken straight from the normalized item."
   [{:keys [item]}]
@@ -62,7 +72,7 @@
 (defmethod extract :paper [{:keys [row] :as readable}]
   (assoc (common readable)
          :date  (:papers/published-at row)
-         :body  (placeholder-body (:papers/abstract row))
+         :body  (paper-body row)
          :links (cond-> []
                   (:papers/doi row)
                   (conj {:label "DOI" :href (str "https://doi.org/" (:papers/doi row))})

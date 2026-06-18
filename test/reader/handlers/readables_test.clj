@@ -46,3 +46,20 @@
             (is (= 200 (:status resp)))
             (is (str/blank? (:body resp)) "empty body removes the row instead of swapping a full 404 page")
             (is (not (str/includes? (:body resp) "Importing")))))))))
+
+(deftest paper-paste-routes-to-the-paper-path-test
+  (with-system [system]
+    (let [ds     (:reader.db/datasource system)
+          create (:reader.handlers.readables/create system)
+          uid    (:users/id (crud/create! ds :users {:email "pp@x.test"}))]
+      (testing "pasting an arXiv link starts a paper (its own ingest path), not an article fetch"
+        (let [resp (create {:user-id uid
+                            :params  {"url" "https://arxiv.org/abs/2401.12345"}
+                            :headers {"hx-request" "true"}})]
+          (is (= 200 (:status resp)))
+          (is (str/includes? (:body resp) "Importing"))
+          (is (str/includes? (:body resp) "arXiv:2401.12345") "the importing row is labeled with the paper")
+          (is (= 1 (count (crud/find-many ds :jobs {:queue-name "extract-paper"}))))
+          (is (zero? (count (crud/find-many ds :jobs {:queue-name "extract-article"})))
+              "an arXiv link is not routed to article ingest")
+          (is (= 1 (count (crud/find-many ds :papers {:arxiv-id "2401.12345"})))))))))

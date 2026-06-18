@@ -9,12 +9,15 @@
    (reader.db.crud/resolve-entity!), so the same author/institution under
    different name spellings collapses to one node."
   (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [honey.sql :as sql]
             [integrant.core :as ig]
             [next.jdbc :as jdbc]
             [reader.affiliations :as affiliations]
             [reader.authors :as authors]
             [reader.db.crud :as crud]
+            [reader.http :as http]
+            [reader.ingest.events :as events]
             [reader.jobs :as jobs]
             [reader.papers.arxiv :as arxiv]
             [reader.papers.openalex :as openalex]
@@ -52,13 +55,22 @@
 
 ;; ── ingest: placeholder + the :extract-paper job ─────────────────────────
 
+(def ^:private openalex-venue-types
+  "OpenAlex source `type` -> our affiliation type enum. OpenAlex's documented set
+   is journal / repository / conference / book series / ebook platform / metadata
+   / other; anything unmapped (or a future new type) falls back to \"other\"."
+  {"journal"        "journal"
+   "repository"     "preprint"
+   "conference"     "conference"
+   "book series"    "journal"
+   "ebook platform" "other"
+   "metadata"       "other"
+   "other"          "other"})
+
 (defn- venue-type
-  "Map an OpenAlex source type to our affiliation type enum."
+  "Map an OpenAlex source type to our affiliation type enum (default \"other\")."
   [openalex-type]
-  (case openalex-type
-    "repository" "preprint"
-    "journal"    "journal"
-    "other"))
+  (get openalex-venue-types openalex-type "other"))
 
 (defn- clear-authorships! [tx paper-id]
   (jdbc/execute! tx (sql/format {:delete-from :authorships
@@ -107,33 +119,69 @@
             (link-author-affiliation! tx aid fid)))))
     (crud/by-id tx :papers paper-id)))
 
+(defn- ref-url
+  "The canonical external URL for a ref — what we link out to, and the `:url`
+   key under which a failure is recorded (so the eval dashboard gets a real domain)."
+  [{:keys [kind id]}]
+  (case kind
+    :arxiv (str "https://arxiv.org/abs/" id)
+    :doi   (str "https://doi.org/" id)))
+
+(def ^:private not-indexed-msg
+  "paper not yet indexed by OpenAlex")
+
+(defn- fetch-graph+body
+  "Fetch the entity graph (+ arXiv body) for `ref` via the async `request-fn`.
+   Returns {:graph :body :openalex-status}. OpenAlex is fired first so its request
+   is in flight while the arXiv body is fetched — http-kit overlaps them, so we
+   wait roughly one round trip, not two. For an arXiv paper OpenAlex misses (its
+   back catalog), the arXiv Atom API is the names-only fallback."
+  [request-fn {:keys [kind id] :as ref}]
+  (let [arxiv?  (= :arxiv kind)
+        work-p  (request-fn (openalex/work-url ref))     ; OpenAlex now in flight
+        body    (when arxiv? (arxiv/fetch-body request-fn id))
+        work    @work-p
+        graph   (or (openalex/parse-graph (:body work))
+                    (when arxiv? (arxiv/fetch-metadata request-fn id)))]
+    {:graph graph :body body :openalex-status (:status work)}))
+
 (defn extract-paper!
-  "Job handler: fetch the OpenAlex graph for the placeholder paper `:paper-id`
-   (+ the reflowable arXiv HTML body, for arXiv), then upsert the entity graph and
-   fill the paper in one transaction. `openalex-fetch`/`body-fetch` are injected
-   (the network edges; tests stub them). A missing OpenAlex record throws
-   non-fatally so the worker retries — OpenAlex may not have indexed a brand-new
-   paper yet. Payload ids arrive as strings (jsonb drops uuid + keyword types), so
-   `:paper-id` is parsed and `:kind` re-keyworded."
-  [ds {:keys [paper-id kind id]} {:keys [openalex-fetch body-fetch meta-fetch]}]
-  (let [ref   {:kind (keyword kind) :id id}
-        ;; OpenAlex first (the rich graph); for an arXiv paper it doesn't have
-        ;; (the back catalog), fall back to the arXiv API for names-only metadata.
-        graph (or (openalex/fetch openalex-fetch ref)
-                  (when (and meta-fetch (= :arxiv (:kind ref)))
-                    (arxiv/fetch-metadata meta-fetch id)))
-        body  (when (= :arxiv (:kind ref)) (arxiv/fetch-body body-fetch id))]
-    (when-not graph
-      (throw (ex-info "no metadata for paper (yet)"
-                      {:ref ref :error-class :paper-not-found})))
-    (jdbc/with-transaction [tx ds]
-      (finalize! tx (parse-uuid (str paper-id)) ref graph body))))
+  "Job handler: fetch the OpenAlex graph for the placeholder paper `:paper-id` (+
+   the reflowable arXiv HTML body, for arXiv), then upsert the entity graph and
+   fill the paper in one transaction. `:request-fn` is injected (the network edge;
+   tests stub it) and records a failure event before re-throwing, like
+   reader.ingest/extract-article!.
+
+   When no metadata is found we distinguish two failures: a DOI that OpenAlex
+   answered 404 for is *not indexed yet* — terminal (re-running won't help for
+   days) and surfaced honestly in the UI. Anything else (an OpenAlex outage, or a
+   missing arXiv record) is left retryable. Payload ids arrive as strings (jsonb
+   drops uuid + keyword types), so `:paper-id` is parsed and `:kind` re-keyworded."
+  [ds {:keys [paper-id kind id]} {:keys [request-fn]}]
+  (let [ref {:kind (keyword kind) :id id}]
+    (try
+      (let [{:keys [graph body openalex-status]} (fetch-graph+body request-fn ref)]
+        (when-not graph
+          (if (and (= :doi (:kind ref)) (= 404 openalex-status))
+            (throw (ex-info not-indexed-msg
+                            {:ref ref :fatal? true :error-class :paper-not-indexed}))
+            (throw (ex-info "no metadata for paper (yet)"
+                            {:ref ref :error-class :paper-not-found}))))
+        (jdbc/with-transaction [tx ds]
+          (finalize! tx (parse-uuid (str paper-id)) ref graph body)))
+      (catch Throwable t
+        ;; The failure event isn't tied to a rolled-back write, but its own insert
+        ;; must never mask the real error — log and swallow a recording failure.
+        (try
+          (events/record! ds {:url (ref-url ref) :outcome :failed
+                              :error-class (or (:error-class (ex-data t)) :unknown)})
+          (catch Throwable e
+            (log/error e "failed to record paper extraction failure event" {:ref ref})))
+        (throw t)))))
 
 (defmethod ig/init-key :reader.papers/extract-paper-handler [_ _]
   (fn [ds payload]
-    (extract-paper! ds payload {:openalex-fetch openalex/http-get
-                                :body-fetch     openalex/http-get
-                                :meta-fetch     openalex/http-get})))
+    (extract-paper! ds payload {:request-fn http/request!})))
 
 ;; ── entry point + status (placeholder/poll flow) ─────────────────────────
 
@@ -184,12 +232,16 @@
 
 (defn status
   "Ingest status of `paper-id` for the poll UI: :done once its body is present or
-   its extract job finished (a non-arXiv paper has metadata but no body), :failed
-   if the job terminally failed, else :importing."
+   its extract job finished (a non-arXiv paper has metadata but no body),
+   :not-indexed when the job terminally failed because OpenAlex hasn't indexed the
+   paper yet (an honest, check-back-later state, not a hard error), :failed for any
+   other terminal failure, else :importing."
   [ds paper-id]
-  (let [st (:jobs/state (first (job-for ds paper-id [])))]
+  (let [job (first (job-for ds paper-id []))
+        st  (:jobs/state job)]
     (cond
-      (= "failed" st)                                                :failed
-      (some? (:papers/body-html (crud/by-id ds :papers paper-id)))   :done
-      (= "done" st)                                                  :done
-      :else                                                          :importing)))
+      (some? (:papers/body-html (crud/by-id ds :papers paper-id)))         :done
+      (= "done" st)                                                        :done
+      (and (= "failed" st) (= "paper-not-indexed" (:jobs/error-class job))) :not-indexed
+      (= "failed" st)                                                      :failed
+      :else                                                                :importing)))

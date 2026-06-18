@@ -46,13 +46,30 @@
     [:div.readable-meta.muted [:span.import-url url]]]])
 
 (defn failed-row
-  "A queue row for an article whose import permanently failed; offers the manual
-   add form as a fallback. No polling — this is terminal."
-  [queue-item-id url]
+  "A queue row for a readable whose import permanently failed. No polling — this is
+   terminal. Articles offer the manual add form as a fallback; papers and
+   newsletters have no manual entry path, so `type` gates that link off rather than
+   pointing them at the article-only form."
+  [queue-item-id label type]
   [:li.readable.failed {:id (str "q-" queue-item-id)}
    [:div.readable-text
     [:div.readable-title "Couldn’t import"]
-    [:div.readable-meta.muted [:span.import-url url] " · " [:a {:href "/articles/new"} "add manually"]]]
+    (into [:div.readable-meta.muted [:span.import-url label]]
+          (when (= type :article)
+            [" · " [:a {:href "/articles/new"} "add manually"]]))]
+   [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
+    [:button {:type "submit" :aria-label "Archive"} trash-icon]]])
+
+(defn unavailable-row
+  "A terminal row for a paper whose source metadata isn't available yet — a brand
+   new DOI OpenAlex hasn't indexed. No polling, and worded honestly: re-adding now
+   won't help (it's days out), but checking back later will."
+  [queue-item-id title]
+  [:li.readable.unavailable {:id (str "q-" queue-item-id)}
+   [:div.readable-text
+    [:div.readable-title title]
+    [:div.readable-meta.muted
+     "Not indexed yet — new papers can take a few days to appear. Check back later."]]
    [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
     [:button {:type "submit" :aria-label "Archive"} trash-icon]]])
 

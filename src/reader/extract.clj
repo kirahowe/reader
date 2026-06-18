@@ -17,7 +17,7 @@
 (defn- placeholder-body
   "Stand-in for a not-yet-rendered body. Shows `preview` (an abstract) when we
    have one, then a notice marking the full text as pending — an article still
-   being fetched/parsed, or a paper whose in-reader PDF viewer isn't built yet."
+   being fetched/parsed, or a paper with no HTML source (e.g. a DOI-only record)."
   [preview]
   [:div.prose
    (when preview [:p.lead preview])

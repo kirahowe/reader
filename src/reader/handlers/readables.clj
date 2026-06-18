@@ -53,6 +53,7 @@
         (response/fragment nil)
         (response/fragment
          (case (ingest-status datasource item)
-           :done   (home/item item)
-           :failed (home/failed-row id (:title item))
+           :done        (home/item item)
+           :not-indexed (home/unavailable-row id (:title item))
+           :failed      (home/failed-row id (:title item) (:type item))
            (home/importing-row id (:title item))))))))

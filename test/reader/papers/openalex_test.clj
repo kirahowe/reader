@@ -1,5 +1,6 @@
 (ns reader.papers.openalex-test
   (:require [charred.api :as json]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [reader.papers.openalex :as openalex])
   (:import (java.time Instant)))
@@ -25,6 +26,16 @@
   (is (= "10.1145/3292500" (openalex/doi-for {:kind :doi :id "10.1145/3292500"})))
   (is (= "10.48550/arxiv.2401.12345" (openalex/doi-for {:kind :arxiv :id "2401.12345"}))))
 
+(deftest work-url-test
+  (testing "the DOI keeps its slashes (OpenAlex matches the literal path)"
+    (is (= "https://api.openalex.org/works/doi:10.1145/3292500.3330701"
+           (openalex/work-url {:kind :doi :id "10.1145/3292500.3330701"}))))
+  (testing "a stray fragment/space in the DOI is percent-encoded, host untouched"
+    (let [url (openalex/work-url {:kind :doi :id "10.1/x#y z"})]
+      (is (str/starts-with? url "https://api.openalex.org/works/doi:10.1/x"))
+      (is (not (str/includes? url "#")) "the # can't open a fragment")
+      (is (not (str/includes? url " ")) "the space is encoded"))))
+
 (deftest normalize-test
   (let [g (openalex/normalize work)]
     (testing "metadata"
@@ -44,9 +55,12 @@
       (is (nil? (:orcid (second (:authors g)))) "missing ORCID stays nil")
       (is (= [] (:institutions (second (:authors g))))))))
 
-(deftest fetch-uses-injected-fn
-  (testing "found → normalized graph"
+(deftest parse-graph-test
+  (testing "a full work body → normalized graph"
     (is (= "Attention Is All You Need"
-           (:title (openalex/fetch (constantly (json/write-json-str work)) {:kind :arxiv :id "1706.03762"})))))
-  (testing "miss (fetch-fn returns nil) → nil"
-    (is (nil? (openalex/fetch (constantly nil) {:kind :doi :id "10.0/none"})))))
+           (:title (openalex/parse-graph (json/write-json-str work))))))
+  (testing "nil / unparseable / non-work body → nil"
+    (is (nil? (openalex/parse-graph nil)))
+    (is (nil? (openalex/parse-graph "not json")))
+    (is (nil? (openalex/parse-graph (json/write-json-str {"meta" {"count" 0}})))
+        "an OpenAlex shape with no work id is a miss")))

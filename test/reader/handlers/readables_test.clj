@@ -5,6 +5,8 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [reader.db.crud :as crud]
+            [reader.jobs :as jobs]
+            [reader.papers :as papers]
             [reader.test-support.setup :refer [with-system]]))
 
 (deftest create-and-poll-test
@@ -63,3 +65,43 @@
           (is (zero? (count (crud/find-many ds :jobs {:queue-name "extract-article"})))
               "an arXiv link is not routed to article ingest")
           (is (= 1 (count (crud/find-many ds :papers {:arxiv-id "2401.12345"})))))))))
+
+(deftest not-indexed-paper-row-is-honest-and-terminal-test
+  (with-system [system]
+    (let [ds  (:reader.db/datasource system)
+          row (:reader.handlers.readables/row system)
+          uid (:users/id (crud/create! ds :users {:email "ni@x.test"}))]
+      (testing "a DOI OpenAlex hasn't indexed renders a non-polling 'check back later' row"
+        (let [{:keys [queue-item]} (papers/start! ds uid {:kind :doi :id "10.9/not-indexed"})
+              qid (:queue-items/id queue-item)
+              job (jobs/claim-next! ds "extract-paper")]
+          (jobs/fail! ds job "not indexed" {:fatal? true :error-class :paper-not-indexed})
+          (let [resp (row {:user-id uid :path-params {:id (str qid)}})]
+            (is (= 200 (:status resp)))
+            (is (str/includes? (:body resp) "Not indexed yet") "honest copy, not a generic failure")
+            (is (not (str/includes? (:body resp) "add manually")) "no misleading article-only fallback")
+            (is (not (str/includes? (:body resp) "Importing")) "terminal — polling stops")))))))
+
+(deftest failed-row-offers-manual-add-only-for-articles-test
+  (with-system [system]
+    (let [ds     (:reader.db/datasource system)
+          create (:reader.handlers.readables/create system)
+          row    (:reader.handlers.readables/row system)
+          uid    (:users/id (crud/create! ds :users {:email "fr@x.test"}))
+          fail!  (fn [queue-name] (jobs/fail! ds (jobs/claim-next! ds queue-name) "boom" {:fatal? true}))
+          row-of (fn [qid] (:body (row {:user-id uid :path-params {:id (str qid)}})))]
+
+      (testing "a failed article offers the manual add fallback"
+        (create {:user-id uid :params {"url" "https://example.com/dead-article"} :headers {"hx-request" "true"}})
+        (fail! "extract-article")
+        (let [qi   (crud/find-1 ds :queue-items {:user-id uid :readable-type "article"})
+              body (row-of (:queue-items/id qi))]
+          (is (str/includes? body "Couldn’t import"))
+          (is (str/includes? body "add manually") "articles have a manual entry form to fall back to")))
+
+      (testing "a failed paper does not — there's no manual paper form to point at"
+        (let [{:keys [queue-item]} (papers/start! ds uid {:kind :doi :id "10.7/dead"})]
+          (fail! "extract-paper")
+          (let [body (row-of (:queue-items/id queue-item))]
+            (is (str/includes? body "Couldn’t import"))
+            (is (not (str/includes? body "add manually")) "no article-only fallback for a paper")))))))

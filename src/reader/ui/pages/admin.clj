@@ -2,7 +2,8 @@
   "The extraction eval dashboard — server-rendered tables + plain numbers over
    reader.admin's aggregates. No charting library; coverage and rates are shown
    as percentages."
-  (:require [reader.ui.layout :as layout]))
+  (:require [reader.ui.components :as c]
+            [reader.ui.layout :as layout]))
 
 (defn- pct [n total]
   (if (and total (pos? total)) (Math/round (* 100.0 (/ (double n) total))) 0))
@@ -34,8 +35,8 @@
   (layout/app-page
    "Extraction eval" nil
    (list
-    [:nav.backnav [:a {:href "/"} "Reading list"]]
-    [:div.page-head [:h1 "Extraction eval"]]
+    (c/back-link "/")
+    (c/page-head "Extraction eval")
 
     [:section
      [:h2 "Overview"]

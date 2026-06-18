@@ -92,13 +92,14 @@
 
 (defn fail!
   "Record a failed run on the leased `job` (the row returned by `claim-next!`)
-   with `error-msg`. The job lands in `\"failed\"` when the error is fatal
-   (`{:fatal? true}`) or it has exhausted `:max-attempts`; otherwise it is
-   rescheduled for a later retry with exponential backoff
-   (`:backoff-base-secs` * 2^(attempts-1)) so a flaky source isn't hammered in
-   a tight loop. Returns nil if our lease no longer holds."
+   with `error-msg` and optional `:error-class` (the handler's ex-data keyword,
+   persisted so consumers can branch on *why* without parsing the message). The
+   job lands in `\"failed\"` when the error is fatal (`{:fatal? true}`) or it has
+   exhausted `:max-attempts`; otherwise it is rescheduled for a later retry with
+   exponential backoff (`:backoff-base-secs` * 2^(attempts-1)) so a flaky source
+   isn't hammered in a tight loop. Returns nil if our lease no longer holds."
   ([ds job error-msg] (fail! ds job error-msg {}))
-  ([ds job error-msg {:keys [fatal? max-attempts backoff-base-secs]
+  ([ds job error-msg {:keys [fatal? max-attempts backoff-base-secs error-class]
                       :or   {max-attempts 5 backoff-base-secs 10}}]
    (let [attempts (:jobs/attempts job)
          give-up? (or fatal? (>= attempts max-attempts))
@@ -106,6 +107,7 @@
      (settle! ds job
               (cond-> {:state        (if give-up? "failed" "pending")
                        :last-error   error-msg
+                       :error-class  (some-> error-class name)
                        :locked-until nil}
                 (not give-up?)
                 (assoc :run-at [:+ [:raw "now()"]

@@ -134,3 +134,18 @@
           (jobs/claim-next! ds "q")   ; another worker reclaims
           (is (nil? (jobs/fail! ds orig-claim "I'm too late"))
               "orig's fail! is a no-op once the new lease is in place"))))))
+
+(deftest fail!-persists-error-class
+  (with-system [system]
+    (let [ds (:reader.db/datasource system)]
+      (testing "the handler's error-class (from ex-data) is stored on the job"
+        (jobs/enqueue! ds "papers" {:n 1})
+        (let [claimed (jobs/claim-next! ds "papers")
+              failed  (jobs/fail! ds claimed "not indexed"
+                                  {:fatal? true :error-class :paper-not-indexed})]
+          (is (= "paper-not-indexed" (:jobs/error-class failed)) "stored as the keyword name")))
+      (testing "absent :error-class leaves the column nil"
+        (jobs/enqueue! ds "papers2" {:n 1})
+        (let [claimed (jobs/claim-next! ds "papers2")
+              failed  (jobs/fail! ds claimed "boom" {:fatal? true})]
+          (is (nil? (:jobs/error-class failed))))))))

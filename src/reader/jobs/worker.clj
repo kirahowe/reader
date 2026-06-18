@@ -25,9 +25,11 @@
         (log/error t "job failed" {:queue queue-name :job-id (:jobs/id job)})
         ;; A handler can flag a permanent failure (ex-data :fatal?) so it lands
         ;; in `failed` immediately; otherwise jobs/fail! retries with backoff and
-        ;; gives up (-> `failed`) once max-attempts is exhausted.
+        ;; gives up (-> `failed`) once max-attempts is exhausted. The :error-class
+        ;; (also from ex-data) is persisted so the UI can branch on the reason.
         (jobs/fail! ds job (or (ex-message t) "error")
                     {:fatal?            (boolean (:fatal? (ex-data t)))
+                     :error-class       (:error-class (ex-data t))
                      :max-attempts      max-attempts
                      :backoff-base-secs backoff-base-secs})))
     true))

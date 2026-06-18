@@ -89,6 +89,34 @@
       (testing "returns nil for an unknown slug"
         (is (nil? (authors/by-slug ds "nobody")))))))
 
+(deftest resolve-canonicalizes-test
+  (with-system [system]
+    (let [ds (:reader.db/datasource system)]
+      (testing "matches an existing author by ORCID even when the display name differs"
+        (let [a (authors/resolve! ds {:name "Yann LeCun" :orcid "0000-0001-1111-1111"})
+              b (authors/resolve! ds {:name "Y. LeCun"   :orcid "0000-0001-1111-1111"})]
+          (is (= (:authors/id a) (:authors/id b)) "same ORCID → one author")
+          (is (= 1 (count (crud/find-many ds :authors {:orcid "0000-0001-1111-1111"}))))))
+
+      (testing "matches by OpenAlex id when ORCID is absent"
+        (let [a (authors/resolve! ds {:name "Jane Roe" :openalex-id "A123"})
+              b (authors/resolve! ds {:name "J. Roe"   :openalex-id "A123"})]
+          (is (= (:authors/id a) (:authors/id b)))))
+
+      (testing "fills newly-known ids onto a name-only author without clobbering existing fields"
+        (let [a (authors/resolve! ds {:name "Grace Hopper" :url "https://gh.example"})
+              b (authors/resolve! ds {:name "Grace Hopper" :orcid "0000-0002-2222-2222"
+                                      :url  "https://other.example"})]
+          (is (= (:authors/id a) (:authors/id b)) "same name, no conflicting id → merged")
+          (is (= "0000-0002-2222-2222" (:authors/orcid b)) "orcid filled in")
+          (is (= "https://gh.example" (:authors/url b)) "existing url not clobbered")))
+
+      (testing "distinct people sharing a name (different ORCIDs) stay separate, slugs disambiguated"
+        (let [a (authors/resolve! ds {:name "John Smith" :orcid "0000-0003-3333-3333"})
+              b (authors/resolve! ds {:name "John Smith" :orcid "0000-0004-4444-4444"})]
+          (is (not= (:authors/id a) (:authors/id b)) "different ORCID → two authors")
+          (is (not= (:authors/slug a) (:authors/slug b)) "slugs disambiguated"))))))
+
 (deftest affiliations-of-test
   (with-system [system]
     (let [ds      (:reader.db/datasource system)

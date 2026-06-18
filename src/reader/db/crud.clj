@@ -112,3 +112,51 @@
                                   :where       [:= :id id]
                                   :returning   [:*]})
                      opts))
+
+;; ── identity-aware upsert (canonical entity resolution) ──────────────────
+
+(defn- blank-fills
+  "The subset of `attrs` (unqualified keys) that would fill a currently-nil
+   column on `row` (keys qualified by `q`) — new info to add, never a clobber."
+  [q row attrs]
+  (reduce-kv (fn [m k v]
+               (if (and (some? v) (nil? (get row (keyword q (name k)))))
+                 (assoc m k v)
+                 m))
+             {}
+             attrs))
+
+(defn- free-slug
+  "A `slug-col` value not yet taken in `table`: `base`, else base-2, base-3, …"
+  [ds table slug-col base]
+  (loop [candidate base n 2]
+    (if (find-1 ds table {slug-col candidate})
+      (recur (str base "-" n) (inc n))
+      candidate)))
+
+(defn resolve-entity!
+  "Identity-aware upsert for canonical graph entities (authors, institutions).
+   Matches `attrs` against existing rows by each key in `id-keys` (priority
+   order, only keys present + non-nil in attrs), else by `slug-key`. A slug match
+   is rejected when it conflicts with a supplied id (the row holds a different
+   non-nil value for an id-key) — distinct entities that share a name don't
+   merge. On a match, fills columns that are nil on the row from attrs (never
+   clobbering) and returns it; on no match, inserts, disambiguating `slug-key`
+   (suffix) when taken. Runs several statements — pass a transaction for
+   atomicity."
+  [ds table {:keys [id-keys slug-key attrs]}]
+  (let [q          (name table)
+        by-id      (some (fn [k] (when-let [v (get attrs k)] (find-1 ds table {k v}))) id-keys)
+        slug-row   (when-let [s (get attrs slug-key)] (find-1 ds table {slug-key s}))
+        conflicts? (fn [row]
+                     (boolean (some (fn [k]
+                                      (let [ours (get attrs k) theirs (get row (keyword q (name k)))]
+                                        (and ours theirs (not= ours theirs))))
+                                    id-keys)))
+        match      (or by-id (when (and slug-row (not (conflicts? slug-row))) slug-row))]
+    (if match
+      (let [fills (blank-fills q match attrs)]
+        (if (seq fills)
+          (update! ds table (get match (keyword q "id")) (assoc fills :updated-at (java.time.Instant/now)))
+          match))
+      (create! ds table (assoc attrs slug-key (free-slug ds table slug-key (get attrs slug-key)))))))

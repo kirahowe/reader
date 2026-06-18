@@ -67,6 +67,23 @@
                  [:slug]
                  {:updated-at [:now]})))
 
+(defn resolve!
+  "Upsert an author by stable identity — ORCID → OpenAlex id → name-slug —
+   filling newly-known fields without clobbering existing ones. `m`: :name
+   (required), optional :orcid :openalex-id :url. The slug is a URL handle derived
+   from the name (disambiguated on collision), not the identity. Returns the row;
+   pass a transaction for atomicity. Use for sourced entities (papers); the bare
+   name-only paths can stay on `find-or-create!` (= the slug fallback)."
+  [tx {:keys [name orcid openalex-id url]}]
+  (crud/resolve-entity! tx :authors
+                        {:id-keys  [:orcid :openalex-id]
+                         :slug-key :slug
+                         :attrs    (cond-> {:name name :slug (slug/slugify name)
+                                            :sort-name (derive-sort-name name)}
+                                     orcid       (assoc :orcid orcid)
+                                     openalex-id (assoc :openalex-id openalex-id)
+                                     url         (assoc :url url))}))
+
 (defn list-sorted
   "All authors ordered by collation key, falling back to the display name
    when `sort-name` is NULL. This COALESCE is the canonical author

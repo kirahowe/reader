@@ -17,6 +17,20 @@
                 [:slug]
                 {:updated-at [:now]}))
 
+(defn resolve!
+  "Upsert an affiliation/institution by stable identity — ROR → OpenAlex id →
+   name-slug — filling newly-known fields without clobbering. `m`: :name
+   (required), optional :type (default \"other\"), :ror :openalex-id :url. Returns
+   the row; pass a transaction for atomicity."
+  [tx {:keys [name type ror openalex-id url] :or {type "other"}}]
+  (crud/resolve-entity! tx :affiliations
+                        {:id-keys  [:ror :openalex-id]
+                         :slug-key :slug
+                         :attrs    (cond-> {:name name :slug (slug/slugify name) :type type}
+                                     ror         (assoc :ror ror)
+                                     openalex-id (assoc :openalex-id openalex-id)
+                                     url         (assoc :url url))}))
+
 (defn list-sorted
   "All affiliations ordered case-insensitively by name — the canonical
    ordering for the sources index."

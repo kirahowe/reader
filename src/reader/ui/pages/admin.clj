@@ -31,11 +31,11 @@
    [:div [:dt "Failed → recovered"] [:dd (str recovered " / " failed-urls)]]])
 
 (defn render [{:keys [overview coverage by-domain errors latency recovery recent-failures]}]
-  (layout/page
-   "Extraction eval"
-   [:main
-    [:nav.index-nav.muted [:a {:href "/"} "Back to your reading list"]]
-    [:h1 "Extraction eval"]
+  (layout/app-page
+   "Extraction eval" nil
+   (list
+    [:nav.backnav [:a {:href "/"} "Reading list"]]
+    [:div.page-head [:h1 "Extraction eval"]]
 
     [:section
      [:h2 "Overview"]
@@ -79,4 +79,4 @@
        [:h2 "Recent failures"]
        (into [:ul.muted]
              (for [{:keys [url error-class]} recent-failures]
-               [:li [:span error-class] " — " [:span.import-url url]]))])]))
+               [:li [:span error-class] " — " [:span.import-url url]]))]))))

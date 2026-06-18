@@ -19,7 +19,12 @@
 (defn render [api-url]
   (layout/page
    "Sign in"
-   [:main
-    [:h1 "Sign in to Reader"]
-    [:hanko-auth]
-    [:script {:type "module"} (hanko-island api-url)]]))
+   [:main.login-main
+    [:div.login-card
+     [:a.brand.brand-lg {:href "/"}
+      [:span.brand-mark layout/book-icon]
+      [:span.brand-word "Reader"]]
+     [:h1 "Welcome back"]
+     [:p.muted.login-tag "Your calm queue for articles, papers, and newsletters."]
+     [:hanko-auth]
+     [:script {:type "module"} (hanko-island api-url)]]]))

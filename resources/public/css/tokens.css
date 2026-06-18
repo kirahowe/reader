@@ -1,28 +1,56 @@
 :root {
-  --bg: #fafaf7;
-  --fg: #1a1a1a;
-  --muted: #6b6b6b;
-  --rule: #e4e1da;
-  --accent: #2b4a3f;
+  /* Reading Room — warm paper, ink, and a deep reading-room green.
+     The palette is deliberately calm: a single green accent does the
+     work, with a warm gold reserved for transient/attention states. */
+  --paper:    #faf7f0;  /* page background */
+  --paper-2:  #f3eee2;  /* raised surfaces: search bar, cards */
+  --ink:      #20201c;  /* primary text */
+  --ink-soft: #44423b;  /* body prose, secondary text */
+  --muted:    #837c6e;  /* meta, captions */
+  --rule:     #e7e0d0;  /* hairline dividers */
+  --rule-2:   #d8cfba;  /* stronger borders: inputs, buttons */
+  --accent:   #2f6354;  /* deep green — links, primary actions */
+  --accent-2: #6f9d8f;  /* lighter green — blockquote rule, dots */
+  --accent-tint: #e7efe9; /* green wash for chips/focus rings */
+  --gold:     #9a6a2f;  /* warm secondary: in-progress, failures */
 
-  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-  --font-prose: Charter, "Iowan Old Style", "Source Serif Pro", Georgia, serif;
+  --shadow-sm: 0 1px 2px rgba(38, 33, 22, 0.05);
+  --shadow-md: 0 8px 30px -12px rgba(38, 33, 22, 0.18);
 
-  --measure: 68ch;
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-prose: "Iowan Old Style", "Source Serif Pro", Charter, Georgia, serif;
 
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 2rem;
-  --space-5: 4rem;
+  --measure: 40rem;  /* reading column */
+  --feed: 46rem;     /* list/page column */
+
+  /* Sharp, modern corners — small radii everywhere, no pills. */
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2.5rem;
+  --s-7: 4rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #141414;
-    --fg: #ececec;
-    --muted: #9a9a9a;
-    --rule: #2a2a2a;
-    --accent: #9fbfb1;
+    --paper:    #16161a;
+    --paper-2:  #1f1f24;
+    --ink:      #ece9e1;
+    --ink-soft: #cbc7bc;
+    --muted:    #908b80;
+    --rule:     #2a2a31;
+    --rule-2:   #383841;
+    --accent:   #7fc3b0;
+    --accent-2: #4f8475;
+    --accent-tint: #1c2a26;
+    --gold:     #d3a567;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
   }
 }

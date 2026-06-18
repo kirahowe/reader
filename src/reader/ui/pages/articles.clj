@@ -26,11 +26,11 @@
    (the submitted params) and `errors` repopulate it after a rejected submit."
   ([affiliations] (new-form affiliations {} nil))
   ([affiliations values errors]
-   (layout/page
-    "Add article"
-    [:main
-     [:nav.index-nav.muted [:a {:href "/"} "Back to your reading list"]]
-     [:h1 "Add article"]
+   (layout/app-page
+    "Add article" nil
+    (list
+     [:nav.backnav [:a {:href "/"} "Reading list"]]
+     [:div.page-head [:h1 "Add article"]]
      [:form.form {:method "post" :action "/articles"}
       (text-field "Title" "title" (get values "title") (:title errors))
       (text-field "URL" "canonical-url" (get values "canonical-url") (:canonical-url errors))
@@ -38,4 +38,4 @@
       [:label
        [:span.label-text "Abstract"]
        [:textarea {:name "abstract"} (get values "abstract")]]
-      [:button {:type "submit"} "Add to reading list"]]])))
+      [:button {:type "submit"} "Add to reading list"]]))))

@@ -7,7 +7,8 @@
             [clojure.tools.logging :as log]
             [integrant.core :as ig]
             [meta-merge.core :as mm]
-            [reader.concerns.integrant :as igc])
+            [reader.concerns.integrant :as igc]
+            [reader.log :as logging])
   (:gen-class))
 
 (defn read-config [config]
@@ -30,11 +31,13 @@
   (apply mm/meta-merge (map load-config profiles)))
 
 (defn prep-config
-  "Reads, merges, and loads namespaces for `profiles`. Returns the
-  merged config map ready for `ig/init`."
+  "Reads, merges, and loads namespaces for `profiles`, then applies global
+  logging config (per-namespace min-levels) before the system starts.
+  Returns the merged config map ready for `ig/init`."
   [profiles]
   (let [config (doto (merge-profiles profiles)
                  (ig/load-namespaces))]
+    (logging/configure! config)
     (log/info "config prepped" {:profiles profiles})
     config))
 

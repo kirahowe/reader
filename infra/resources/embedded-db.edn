@@ -10,7 +10,13 @@
 ;; have applied first — without that ref, Integrant is free to start a
 ;; consumer in parallel with the migrator and the consumer can race.
 
-{:reader.dev.infra/postgres {}
+{;; Embedded Postgres (io.zonky) and the HikariCP pool over it log through
+ ;; SLF4J → Telemere; quiet that infra chatter wherever this fragment is used
+ ;; (dev, tests). Prod skips this fragment and keeps the library logs.
+ :reader.log/publisher {:min-levels {"io.zonky.*"   :warn
+                                     "com.zaxxer.*" :warn}}
+
+ :reader.dev.infra/postgres {}
 
  :reader.db/datasource
  {:spec #ig/ref :reader.dev.infra/postgres}

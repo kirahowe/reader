@@ -1,13 +1,13 @@
-(ns reader.newsletters
+(ns reader.domain.newsletters
   "Newsletter domain: resolve the sending affiliation (a newsletter source keyed
    on its sender-domain pattern) and record an inbound issue as a queued
    readable. Idempotent on the email Message-ID so a redelivery doesn't
    double-ingest. All writes assume an open transaction `tx`."
   (:require [clojure.string :as str]
-            [reader.authors :as authors]
+            [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
-            [reader.reading :as reading]
-            [reader.slug :as slug])
+            [reader.domain.reading :as reading]
+            [reader.util.slug :as slug])
   (:import (java.time Instant)))
 
 (defn- domain-of [email]

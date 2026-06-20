@@ -1,8 +1,8 @@
-(ns reader.users-test
+(ns reader.domain.users-test
   "Integration tests for user lookup and provisioning against a real database."
   (:require [clojure.test :refer [deftest is testing]]
             [reader.test-support.setup :refer [with-system]]
-            [reader.users :as users]))
+            [reader.domain.users :as users]))
 
 (deftest find-and-provision-test
   (with-system [system]

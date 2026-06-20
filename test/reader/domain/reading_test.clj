@@ -1,10 +1,10 @@
-(ns reader.reading-test
+(ns reader.domain.reading-test
   "Integration tests for the per-user reading queue: queue assembly + filtering,
    enqueue, and owner-scoped archive. Real embedded Postgres via with-system."
   (:require [clojure.test :refer [deftest is testing]]
             [reader.db.crud :as crud]
-            [reader.readables :as readables]
-            [reader.reading :as reading]
+            [reader.domain.readables :as readables]
+            [reader.domain.reading :as reading]
             [reader.test-support.setup :refer [with-system]])
   (:import (java.time Instant)))
 

@@ -1,8 +1,8 @@
-(ns reader.inboxes-test
+(ns reader.domain.inboxes-test
   "Per-user inbound alias provisioning. Real embedded Postgres via with-system."
   (:require [clojure.test :refer [deftest is testing]]
             [reader.db.crud :as crud]
-            [reader.inboxes :as inboxes]
+            [reader.domain.inboxes :as inboxes]
             [reader.test-support.setup :refer [with-system]]))
 
 (defn- mk-user [ds email] (:users/id (crud/create! ds :users {:email email})))

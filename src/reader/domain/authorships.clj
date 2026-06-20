@@ -1,4 +1,4 @@
-(ns reader.authorships
+(ns reader.domain.authorships
   "Bridges authors and readables (articles, papers, newsletter issues)
    via a polymorphic FK that postgres cannot enforce. Every write goes
    through here so the readable target is validated in-process, and the

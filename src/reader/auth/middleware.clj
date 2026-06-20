@@ -7,7 +7,7 @@
   (:require [clojure.string :as str]
             [integrant.core :as ig]
             [reader.auth :as auth]
-            [reader.users :as users]
+            [reader.domain.users :as users]
             [reader.web.response :as response]))
 
 (defn- public? [req]

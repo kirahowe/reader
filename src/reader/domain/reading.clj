@@ -1,19 +1,19 @@
-(ns reader.reading
+(ns reader.domain.reading
   "The per-user reading queue. `queue_items` is the per-user relation
    (`user_id`); the readables it points at are shared. So removing something
    from a queue archives the queue item — it never touches the shared readable
    or any other user's queue. The queue view joins each item to its normalized
-   readable (see reader.readables/catalog-of)."
+   readable (see reader.domain.readables/catalog-of)."
   (:require [reader.db.crud :as crud]
-            [reader.readables :as readables]))
+            [reader.domain.readables :as readables]))
 
 (def ^:private readable-type->type
-  "queue_items.readable_type string -> the :type keyword reader.readables uses."
+  "queue_items.readable_type string -> the :type keyword reader.domain.readables uses."
   {"article" :article "paper" :paper "newsletter_issue" :newsletter-issue})
 
 (defn queue
   "`user-id`'s active (non-archived) queue, newest first. Each entry is a
-   normalized readable (reader.readables) plus :queue-item-id, :state, and
+   normalized readable (reader.domain.readables) plus :queue-item-id, :state, and
    :added-at. Reads only the readables this user has queued, not the whole
    catalog. Skips a queue item whose readable has since been removed."
   [ds user-id]
@@ -134,7 +134,7 @@
 
 (defn open
   "The reader payload for `user-id`'s queue item `queue-item-id`: the queue item
-   joined to its full readable (`reader.readables/find-one`), or nil when the
+   joined to its full readable (`reader.domain.readables/find-one`), or nil when the
    item is missing, isn't theirs, or its readable has since been removed. The
    readable's type is threaded from the queue row, not re-derived. Marks an
    `unread` item as `reading` on first open (stamping `started-at`), only once

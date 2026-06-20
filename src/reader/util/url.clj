@@ -1,4 +1,4 @@
-(ns reader.url
+(ns reader.util.url
   "URL canonicalization for identity and dedup. Pure and stdlib-only
    (java.net.URI): lowercases the scheme and host, drops the default port,
    strips the fragment, and preserves the path and query — so trivially

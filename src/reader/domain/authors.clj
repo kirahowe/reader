@@ -1,4 +1,4 @@
-(ns reader.authors
+(ns reader.domain.authors
   "Author domain logic. `sort-name` (the \"Last, First\" collation key) is
    optional; when omitted, `create!` derives it conservatively, bailing to
    nil on anything ambiguous. A nil sort-name falls back to display-name
@@ -7,7 +7,7 @@
             [honey.sql :as sql]
             [next.jdbc :as jdbc]
             [reader.db.crud :as crud]
-            [reader.slug :as slug]))
+            [reader.util.slug :as slug]))
 
 ;; Tokens that make a two-word name *not* a plain "First Last": a leading
 ;; article ("The Atlantic"), a name particle ("Van Halen", "de Beauvoir"),

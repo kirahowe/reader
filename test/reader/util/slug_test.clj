@@ -1,6 +1,6 @@
-(ns reader.slug-test
+(ns reader.util.slug-test
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.slug :as slug]))
+            [reader.util.slug :as slug]))
 
 (deftest slugify-test
   (testing "lowercases and hyphenates word boundaries"

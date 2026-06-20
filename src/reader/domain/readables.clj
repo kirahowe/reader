@@ -1,8 +1,8 @@
-(ns reader.readables
+(ns reader.domain.readables
   "Assembles the cross-table readable catalog: every readable (article, paper,
    newsletter issue) normalized to one shape, joined to its source affiliation
    and its authors. This is the shared library; the per-user reading queue
-   (reader.reading) is drawn from it. The join happens in Clojure over a
+   (reader.domain.reading) is drawn from it. The join happens in Clojure over a
    handful of plain CRUD reads — the data is small and the result is far
    easier to test as a value than as SQL. Note this is the readable's *own*
    affiliation (its publisher/source); an author's affiliations are a
@@ -87,7 +87,7 @@
   "Every readable named by `refs`, normalized and joined to source + authors.
    `refs` is a seq of `[type id]` pairs (the `:type`/`:id` a normalized item
    carries). Reads only those readable rows plus the affiliations, authorships,
-   and authors they reference — so the per-user queue (reader.reading) that
+   and authors they reference — so the per-user queue (reader.domain.reading) that
    draws on this touches only what the user has queued, not the whole library."
   [ds refs]
   (let [ids-by-table (-> (group-by (comp type->table first) refs)

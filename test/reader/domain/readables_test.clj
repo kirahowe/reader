@@ -1,10 +1,10 @@
-(ns reader.readables-test
+(ns reader.domain.readables-test
   "Unit tests for the pure readable-catalog assembly. No database — `assemble`
    takes the already-fetched rows (kebab-qualified, exactly as
    `reader.db.crud` returns them) and produces the normalized catalog the
    per-user queue is drawn from."
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.readables :as readables]))
+            [reader.domain.readables :as readables]))
 
 (def ^:private ny   #uuid "00000000-0000-0000-0000-0000000000a1")
 (def ^:private act  #uuid "00000000-0000-0000-0000-0000000000a2")

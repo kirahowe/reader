@@ -26,7 +26,7 @@ flowchart TB
     mw["Ring middleware<br/><i>logging, auth, anti-forgery</i>"]
 
     subgraph domain["Domain handlers"]
-      reading["reader.reading<br/><i>queue, mark read</i>"]
+      reading["reader.domain.reading<br/><i>queue, mark read</i>"]
       lib["reader.library<br/><i>authors, affiliations</i>"]
       inbound["reader.inbound<br/><i>/api/inbound</i>"]
       authui["reader.auth<br/><i>session, magic-link</i>"]

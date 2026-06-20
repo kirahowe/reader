@@ -1,6 +1,6 @@
-(ns reader.url-test
+(ns reader.util.url-test
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.url :as url]))
+            [reader.util.url :as url]))
 
 (deftest canonicalize-test
   (testing "lowercases scheme and host, preserving case-sensitive path and query"

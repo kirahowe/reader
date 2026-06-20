@@ -3,7 +3,7 @@
    inbound alias, then render. `inbound-domain` is the configured inbound-email
    domain, supplied per-environment."
   (:require [integrant.core :as ig]
-            [reader.inboxes :as inboxes]
+            [reader.domain.inboxes :as inboxes]
             [reader.ui.pages.settings :as pages]
             [reader.web.response :as response]))
 

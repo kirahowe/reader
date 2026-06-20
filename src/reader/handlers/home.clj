@@ -1,6 +1,6 @@
 (ns reader.handlers.home
   (:require [integrant.core :as ig]
-            [reader.reading :as reading]
+            [reader.domain.reading :as reading]
             [reader.ui.pages.home :as home]
             [reader.web.response :as response]))
 

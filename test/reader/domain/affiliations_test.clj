@@ -1,7 +1,7 @@
-(ns reader.affiliations-test
-  "Tests for `reader.affiliations`."
+(ns reader.domain.affiliations-test
+  "Tests for `reader.domain.affiliations`."
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.affiliations :as affiliations]
+            [reader.domain.affiliations :as affiliations]
             [reader.db.crud :as crud]
             [reader.test-support.setup :refer [with-system]]))
 

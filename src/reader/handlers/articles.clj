@@ -1,9 +1,9 @@
 (ns reader.handlers.articles
   (:require [integrant.core :as ig]
             [next.jdbc :as jdbc]
-            [reader.affiliations :as affiliations]
-            [reader.articles :as articles]
-            [reader.reading :as reading]
+            [reader.domain.affiliations :as affiliations]
+            [reader.domain.articles :as articles]
+            [reader.domain.reading :as reading]
             [reader.ui.pages.articles :as pages]
             [reader.web.response :as response]))
 

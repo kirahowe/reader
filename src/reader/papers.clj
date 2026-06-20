@@ -13,15 +13,15 @@
             [honey.sql :as sql]
             [integrant.core :as ig]
             [next.jdbc :as jdbc]
-            [reader.affiliations :as affiliations]
-            [reader.authors :as authors]
+            [reader.domain.affiliations :as affiliations]
+            [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
             [reader.http :as http]
             [reader.ingest.events :as events]
             [reader.jobs :as jobs]
             [reader.papers.arxiv :as arxiv]
             [reader.papers.openalex :as openalex]
-            [reader.reading :as reading])
+            [reader.domain.reading :as reading])
   (:import (java.time Instant)))
 
 (def ^:private arxiv-new #"(?i)(\d{4}\.\d{4,5})(?:v\d+)?")

@@ -1,8 +1,8 @@
-(ns reader.authors-test
-  "Tests for `reader.authors`: the pure sort-name heuristic plus the
+(ns reader.domain.authors-test
+  "Tests for `reader.domain.authors`: the pure sort-name heuristic plus the
    create!/list-sorted integration behaviour it feeds."
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.authors :as authors]
+            [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
             [reader.test-support.setup :refer [with-system]]))
 

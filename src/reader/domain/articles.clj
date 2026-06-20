@@ -1,4 +1,4 @@
-(ns reader.articles
+(ns reader.domain.articles
   "Article domain logic. The form helpers here are pure so the HTTP handler
    stays glue: it parses request params to a clean attrs map, validates it,
    and only then writes. `create!` is the single write edge."
@@ -6,7 +6,7 @@
             [malli.core :as m]
             [malli.error :as me]
             [reader.db.crud :as crud]
-            [reader.slug :as slug]))
+            [reader.util.slug :as slug]))
 
 (defn- blank->nil [s]
   (when-not (str/blank? s) (str/trim s)))
@@ -69,7 +69,7 @@
   "Pure: the article column map to finalize a placeholder from an extraction
    context (reader.ingest.extract) plus a resolved affiliation id (nil ok).
    `now` (an Instant) is injected for `updated-at` — a HoneySQL [:now] would be
-   jsonb-encoded by crud/update! (see reader.db.crud / reader.reading). Title
+   jsonb-encoded by crud/update! (see reader.db.crud / reader.domain.reading). Title
    falls back to the url so the NOT NULL column is always satisfied."
   [extract affiliation-id now]
   (let [f     (:fields extract)

@@ -1,5 +1,5 @@
 (ns reader.extract
-  "The extraction abstraction. Turns a stored readable (`reader.readables/find-one`
+  "The extraction abstraction. Turns a stored readable (`reader.domain.readables/find-one`
    payload) into a uniform content map the reader view renders blind to type:
    {:title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.
@@ -59,7 +59,7 @@
    :source  (:source item)})
 
 (defmulti extract
-  "A `reader.readables/find-one` payload ({:item :row}) -> the uniform content
+  "A `reader.domain.readables/find-one` payload ({:item :row}) -> the uniform content
    map {:title :authors :source :date :body :links}. Dispatches on readable :type."
   (fn [{:keys [item]}] (:type item)))
 

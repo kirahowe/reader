@@ -7,7 +7,7 @@
             [reader.db.crud :as crud]
             [reader.ingest :as ingest]
             [reader.ingest.email-test :refer [raw-eml]]
-            [reader.reading :as reading]
+            [reader.domain.reading :as reading]
             [reader.storage :as storage]
             [reader.test-support.setup :refer [with-system]]))
 

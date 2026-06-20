@@ -1,4 +1,4 @@
-(ns reader.inboxes
+(ns reader.domain.inboxes
   "Per-user inbound email aliases. Each user has a friendly-but-unguessable alias
    address — a haikunator `adjective-noun` name plus a random token, e.g.
    `aged-morning-k3f9x2@themiscellany.app`. Newsletters forwarded to it land in

@@ -40,7 +40,7 @@ Postgres becomes the source of truth for everything that's not a blob.
 - `reader.db.types` — global next.jdbc extensions so Clojure maps and
   vectors marshal into Postgres `jsonb`, and `java.time.Instant` binds
   as `timestamptz`.
-- `reader.authorships` — polymorphic FK validator for the
+- `reader.domain.authorships` — polymorphic FK validator for the
   readable→author bridge (postgres can't enforce it).
 - `reader.jobs` — durable job queue with `enqueue!`, `claim-next!`
   (atomic via `SELECT … FOR UPDATE SKIP LOCKED`), `complete!`, `fail!`.
@@ -77,7 +77,7 @@ callback route.
   otherwise verify the cookie, load/provision the invited user, attach
   `:user`/`:user-id`, redirect a browser GET to `/login` (401 for other
   methods, 403 for a valid-but-uninvited identity).
-- `reader.users` — find-or-provision from a verified identity.
+- `reader.domain.users` — find-or-provision from a verified identity.
 - `reader.web.csrf` — Origin/Referer check on unsafe methods, since the
   cookie session introduces a CSRF surface.
 - `reader.ui.pages.login` + `reader.handlers.auth` — the `<hanko-auth>`
@@ -119,14 +119,14 @@ read/unread, and archive them.
 - State changes are a plain `POST` → `303` redirect (full server
   render), not an HTMX in-place swap. HTMX for mark-read is deferred
   until the reader view lands.
-- `reader.reading/enqueue!` already exists and `POST /articles`
+- `reader.domain.reading/enqueue!` already exists and `POST /articles`
   enqueues a hand-added article in the **same transaction** as the
   insert — a manual-ingest primitive that arrives ahead of Step 5
   (no async job or extraction yet).
 
 **Delivered**
-- `reader.reading` — per-user queue assembly (scoped reads via
-  `reader.readables/catalog-of`, so a render touches only the user's
+- `reader.domain.reading` — per-user queue assembly (scoped reads via
+  `reader.domain.readables/catalog-of`, so a render touches only the user's
   queued readables, not the whole library), `enqueue!` (upsert), and
   owner-scoped `archive!`.
 - `reader.handlers.queue` — `POST /queue/:id/archive`, owner-scoped (a
@@ -194,7 +194,7 @@ worker, no domain needed):**
   Malli-validated payload, resolves the alias to a user, enqueues
   `:ingest-email`. Fails closed when the shared secret is unset.
 - `reader.ingest/ingest-email!` + `reader.ingest.email` +
-  `reader.newsletters` — fetch the `.eml`, parse it (Jakarta Mail:
+  `reader.domain.newsletters` — fetch the `.eml`, parse it (Jakarta Mail:
   subject, sender, sent-at, Message-ID, jsoup-sanitized body), resolve or
   create the newsletter source by sender domain and the author from the
   From line, write `newsletter_issues` + `authorships` + `queue_items` in

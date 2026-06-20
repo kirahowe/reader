@@ -5,7 +5,7 @@
    verification lives in reader.web.signature; this is the payload + freshness +
    enqueue logic, kept out of the HTTP handler."
   (:require [malli.core :as m]
-            [reader.inboxes :as inboxes]
+            [reader.domain.inboxes :as inboxes]
             [reader.jobs :as jobs]
             [reader.storage :as storage]))
 

@@ -10,9 +10,9 @@
             [honey.sql :as sql]
             [integrant.core :as ig]
             [next.jdbc :as jdbc]
-            [reader.affiliations :as affiliations]
-            [reader.articles :as articles]
-            [reader.authors :as authors]
+            [reader.domain.affiliations :as affiliations]
+            [reader.domain.articles :as articles]
+            [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
             [reader.ingest.email :as email]
             [reader.ingest.entities :as entities]
@@ -21,11 +21,11 @@
             [reader.ingest.fetch :as fetch]
             [reader.ingest.schema :as schema]
             [reader.jobs :as jobs]
-            [reader.newsletters :as newsletters]
-            [reader.reading :as reading]
-            [reader.slug :as slug]
+            [reader.domain.newsletters :as newsletters]
+            [reader.domain.reading :as reading]
+            [reader.util.slug :as slug]
             [reader.storage :as storage]
-            [reader.url :as url])
+            [reader.util.url :as url])
   (:import [java.time Instant]))
 
 (defn- clear-authorships! [tx readable-type readable-id]
@@ -136,7 +136,7 @@
 
 (defn normalize-url
   "The canonical http(s) URL for a pasted string, or nil when it isn't a valid
-   http(s) URL (reader.url/canonicalize). The canonical form is what we store
+   http(s) URL (reader.util.url/canonicalize). The canonical form is what we store
    and dedup on, so equivalent URLs don't fork into separate articles."
   [s]
   (url/canonicalize s))

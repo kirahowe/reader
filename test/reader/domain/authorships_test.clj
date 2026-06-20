@@ -1,8 +1,8 @@
-(ns reader.authorships-test
-  "Integration tests for `reader.authorships` — the polymorphic
+(ns reader.domain.authorships-test
+  "Integration tests for `reader.domain.authorships` — the polymorphic
    readable<->author bridge whose FK postgres cannot enforce."
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.authorships :as authorships]
+            [reader.domain.authorships :as authorships]
             [reader.db.crud :as crud]
             [reader.test-support.setup :refer [with-system]]))
 

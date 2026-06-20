@@ -1,6 +1,6 @@
 (ns reader.handlers.queue
   (:require [integrant.core :as ig]
-            [reader.reading :as reading]
+            [reader.domain.reading :as reading]
             [reader.web.request :as request]
             [reader.web.response :as response]))
 

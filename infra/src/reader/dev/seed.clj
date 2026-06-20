@@ -1,7 +1,7 @@
 (ns reader.dev.seed
   "Drops a coherent set of realistic fixtures into the dev database so
    `bb db:seed` produces something worth pointing a UI at. Two users with
-   overlapping queues, so the per-user reading queue (reader.reading) has
+   overlapping queues, so the per-user reading queue (reader.domain.reading) has
    something real to show: some queue items point at the same underlying
    readable, held at different states by each user.
 
@@ -18,8 +18,8 @@
             [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
             [next.jdbc.transaction]
-            [reader.authors :as authors]
-            [reader.authorships :as authorships]
+            [reader.domain.authors :as authors]
+            [reader.domain.authorships :as authorships]
             [reader.db.crud :as crud]
             [reader.inbound :as inbound]
             [reader.ingest :as ingest]
@@ -160,7 +160,7 @@
 (defn- seed-in-tx! [tx]
   (jdbc/execute! tx [(str "TRUNCATE " (str/join ", " seeded-tables) " CASCADE")])
   (let [;; Authors. sort-name omitted: these "First Last" bylines derive cleanly
-        ;; via the heuristic in reader.authors/create!.
+        ;; via the heuristic in reader.domain.authors/create!.
         didion  (authors/create! tx {:name "Joan Didion"
                                      :slug "joan-didion"
                                      :bio  "American essayist and novelist."})

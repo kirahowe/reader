@@ -1,6 +1,6 @@
 (ns reader.handlers.authors
   (:require [integrant.core :as ig]
-            [reader.authors :as authors]
+            [reader.domain.authors :as authors]
             [reader.ui.pages.authors :as pages]
             [reader.web.response :as response]))
 

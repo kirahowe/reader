@@ -4,8 +4,8 @@
    placeholder article into a fully extracted, authored row."
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
-            [reader.affiliations :as affiliations]
-            [reader.authors :as authors]
+            [reader.domain.affiliations :as affiliations]
+            [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
             [reader.ingest :as ingest]
             [reader.ingest.entities :as entities]

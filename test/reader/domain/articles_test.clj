@@ -1,8 +1,8 @@
-(ns reader.articles-test
-  "Tests for `reader.articles`. The pure form helpers (slugify, parse-form,
+(ns reader.domain.articles-test
+  "Tests for `reader.domain.articles`. The pure form helpers (slugify, parse-form,
    validate) need no database; `create!` is integration-tested separately."
   (:require [clojure.test :refer [deftest is testing]]
-            [reader.articles :as articles]
+            [reader.domain.articles :as articles]
             [reader.db.crud :as crud]
             [reader.test-support.setup :refer [with-system]]))
 

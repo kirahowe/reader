@@ -1,4 +1,4 @@
-(ns reader.slug
+(ns reader.util.slug
   "URL slug derivation, shared by the domains that need one (articles, authors,
    affiliations). Not unique by construction — lowercased, non-alphanumeric runs
    collapsed to a single hyphen, hyphens trimmed off the ends. Callers that need

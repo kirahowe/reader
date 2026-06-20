@@ -8,7 +8,7 @@
             [clojure.test :refer [deftest is testing]]
             [integrant.core :as ig]
             [reader.db.crud :as crud]
-            [reader.inboxes :as inboxes]
+            [reader.domain.inboxes :as inboxes]
             [reader.storage :as storage]
             [reader.test-support.setup :refer [with-system]]
             [reader.web.signature :as sig]

@@ -1,7 +1,7 @@
 (ns reader.handlers.reader
   (:require [integrant.core :as ig]
             [reader.extract :as extract]
-            [reader.reading :as reading]
+            [reader.domain.reading :as reading]
             [reader.ui.pages.reader :as pages]
             [reader.web.request :as request]
             [reader.web.response :as response]))

@@ -1,10 +1,10 @@
-(ns reader.affiliations
+(ns reader.domain.affiliations
   "Affiliation domain logic. Affiliations are publications/outlets — the
    `source` side of a readable and the place side of an author_affiliation."
   (:require [honey.sql :as sql]
             [next.jdbc :as jdbc]
             [reader.db.crud :as crud]
-            [reader.slug :as slug]))
+            [reader.util.slug :as slug]))
 
 (defn find-or-create!
   "Find an affiliation by the slug derived from `name`, or create it with a

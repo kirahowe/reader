@@ -1,6 +1,6 @@
 (ns reader.extract-test
   "Unit tests for the extraction seam. Pure — `extract` takes a
-   `reader.readables/find-one` payload ({:item :row}) and returns the uniform
+   `reader.domain.readables/find-one` payload ({:item :row}) and returns the uniform
    content map the reader view renders. Bodies are placeholders this phase, so we
    assert the real fields (title/byline/source/links) precisely and just check
    the placeholder body surfaces the right text."

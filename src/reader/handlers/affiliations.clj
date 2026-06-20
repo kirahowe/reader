@@ -1,6 +1,6 @@
 (ns reader.handlers.affiliations
   (:require [integrant.core :as ig]
-            [reader.affiliations :as affiliations]
+            [reader.domain.affiliations :as affiliations]
             [reader.ui.pages.affiliations :as pages]
             [reader.web.response :as response]))
 

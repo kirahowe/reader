@@ -1,4 +1,4 @@
-(ns reader.users
+(ns reader.domain.users
   "User domain logic. Users are provisioned from a verified Hanko identity; the
    allowlist decision lives in `reader.auth` and the orchestration in the auth
    middleware, so this namespace is just the reads and the write."

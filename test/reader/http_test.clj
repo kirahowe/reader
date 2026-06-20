@@ -13,7 +13,7 @@
             [org.httpkit.server :as http]
             [reader.db.crud :as crud]
             [reader.dev.seed :as seed]
-            [reader.reading :as reading]
+            [reader.domain.reading :as reading]
             [reader.test-support.auth :as test-auth]
             [reader.test-support.setup :refer [with-system]]
             [ring.mock.request :as mock])

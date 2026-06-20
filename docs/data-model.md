@@ -30,7 +30,7 @@ has a personal site, that's an affiliation, not a column on this table.
 **`sort_name` is nullable on purpose.** Authors mostly arrive as a single
 scraped byline string, and "First Last" → "Last, First" can't be inferred
 reliably for mononyms, organizations, particles ("van", "de"), or
-non-Western name orders. So `reader.authors/create!` only derives a
+non-Western name orders. So `reader.domain.authors/create!` only derives a
 sort key for *unambiguous* two-part names and leaves the rest NULL.
 Ordering uses `COALESCE(sort_name, name)`, so a NULL just sorts by display
 name — a fine default. A manually supplied `sort_name` always overrides

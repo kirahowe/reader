@@ -3,9 +3,17 @@
    `bb db:seed` produces something worth pointing a UI at. Two users with
    overlapping queues, so the per-user reading queue (reader.reading) has
    something real to show: some queue items point at the same underlying
-   readable, held at different states by each user. Idempotent — truncates the
-   seeded tables first, so re-running against an already-populated dev db is
-   safe. Lives in `infra/src/` so it stays out of the prod uberjar."
+   readable, held at different states by each user.
+
+   Hybrid by design: the bulk is a direct-seeded library of already-extracted
+   readables (instant content, no jobs), but `seed-live-jobs!` also drives one
+   real job of each type through its production entry point so the dev worker
+   exercises the whole pipeline on every seed — the place a broken handler or a
+   drifted payload first surfaces.
+
+   Idempotent for the direct-seeded part — truncates the seeded tables first, so
+   re-running against an already-populated dev db is safe. Lives in `infra/src/`
+   so it stays out of the prod uberjar."
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
@@ -13,7 +21,10 @@
             [reader.authors :as authors]
             [reader.authorships :as authorships]
             [reader.db.crud :as crud]
-            [reader.jobs :as jobs]))
+            [reader.inbound :as inbound]
+            [reader.ingest :as ingest]
+            [reader.jobs :as jobs]
+            [reader.papers :as papers]))
 
 (def ^:private seeded-tables
   ["authors" "affiliations" "author_affiliations" "newsletter_sources"
@@ -21,6 +32,103 @@
    "email_inboxes" "queue_items" "jobs"])
 
 (def ^:private local-hosts #{"localhost" "127.0.0.1" "::1" "[::1]"})
+
+;; Body HTML for the direct-seeded library. These stand in for readables already
+;; extracted: real bodies are normally produced by the fetch/extract jobs and
+;; sanitized at the ingest boundary, but seeding them directly gives the UI
+;; instant content without waiting on (or depending on) the network. The
+;; freshly-ingested items that DO exercise the jobs are set up by seed-live-jobs!
+;; below. Articles/newsletters open with a `.lead` paragraph (the reader draws a
+;; drop cap on it); the papers carry MathML so equation reflow is exercised.
+;; Attributes use single quotes to keep these Clojure string literals clean.
+
+(def ^:private white-album-html
+  (str "<p class='lead'>For a season I kept a list of the things I would need in case the center did not hold: a quart of bourbon, two decks of cards, a transistor radio that took batteries the stores had stopped stocking.</p>"
+       "<p>The summer ran long that year. We rented a house on a curve of the coast where the fog came in by four o'clock and stayed, and I learned to recognize the particular silence that precedes a phone call you do not want to take.</p>"
+       "<h2>An attack of vertigo and nausea</h2>"
+       "<p>The doctors had a vocabulary for it and I had another, and somewhere between the two the days went by. I made notes. I have the notes still, and reading them now I cannot always tell which sentences were observation and which were symptom.</p>"
+       "<blockquote><p>The princess is caged in the consulate. The man with the candy will lead the children into the sea.</p></blockquote>"
+       "<p>This is not a story about that summer so much as a record of what it felt like to assemble one and find the pieces would not stay where I set them.</p>"))
+
+(def ^:private slouching-html
+  (str "<p class='lead'>The center was not holding in the cold late spring of 1967, and the children were gathering where the rents were cheapest and the light came down at a slant through the eucalyptus.</p>"
+       "<p>I went looking for a girl named Susan who was said to be living on the Panhandle, and instead I found a kitchen full of people none of whom would give a last name, passing a single orange between them as though it were a sacrament.</p>"
+       "<h2>What it was like to be there</h2>"
+       "<p>They had come from everywhere and from nowhere in particular, and they spoke a dialect assembled out of song lyrics and half-remembered lectures. To ask them a direct question was to watch the question dissolve.</p>"
+       "<p>I stayed three weeks. By the end I had filled two notebooks and understood, if anything, less than when I arrived.</p>"))
+
+(def ^:private marvin-html
+  (str "<p class='lead'>Go. I roll the dice — a six and a two — and move the flatiron to St. Charles Place, which I buy for one hundred and forty dollars.</p>"
+       "<p>My opponent and I have been playing for the better part of an afternoon, and the board between us has begun to feel less like a diagram than like a city we are both responsible for.</p>"
+       "<h2>The real and the printed streets</h2>"
+       "<p>Outside the window the actual Atlantic City runs down to the actual sea. The streets named on the board are out there too, most of them — though Marvin Gardens, the one everyone remembers, is not in Atlantic City at all, and never was.</p>"
+       "<blockquote><p>It is a suburb within a suburb, secure behind a wrought-iron fence, and it is misspelled.</p></blockquote>"
+       "<p>I land on Boardwalk, which my opponent owns, and on which he has built a hotel. I count out the rent. The afternoon, and the city, go on without me.</p>"))
+
+(def ^:private attention-html
+  (str "<h2>Introduction</h2>"
+       "<p>Recurrent models factor computation along the symbol positions of the input and output sequences, precluding parallelization within training examples. We propose the Transformer, an architecture that dispenses with recurrence entirely and relies instead on an attention mechanism to draw global dependencies between input and output.</p>"
+       "<h2>Scaled Dot-Product Attention</h2>"
+       "<p>The input consists of queries and keys of dimension <math><msub><mi>d</mi><mi>k</mi></msub></math> and values of dimension <math><msub><mi>d</mi><mi>v</mi></msub></math>. We compute the dot products of the query with all keys, divide each by <math><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></math>, and apply a softmax to obtain the weights on the values:</p>"
+       "<math display='block'><mrow><mi>Attention</mi><mo>(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo>)</mo><mo>=</mo><mi>softmax</mi><mo>(</mo><mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mi>T</mi></msup></mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><mo>)</mo><mi>V</mi></mrow></math>"
+       "<p>Additive attention and dot-product attention are the two common variants; ours is the latter, scaled by the factor above to keep the softmax in a region with usable gradients.</p>"))
+
+(def ^:private resnet-html
+  (str "<h2>Introduction</h2>"
+       "<p>Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks substantially deeper than those used previously, reformulating the layers as learning residual functions with reference to the layer inputs rather than unreferenced functions.</p>"
+       "<h2>Residual Learning</h2>"
+       "<p>Consider <math><mrow><mi>H</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math> as an underlying mapping to be fit by a few stacked layers, with <math><mi>x</mi></math> the input to the first of them. Rather than hope the layers approximate that mapping directly, we let them approximate a residual function, recasting the original mapping as:</p>"
+       "<math display='block'><mrow><mi>H</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>F</mi><mo>(</mo><mi>x</mi><mo>,</mo><mo>{</mo><msub><mi>W</mi><mi>i</mi></msub><mo>}</mo><mo>)</mo><mo>+</mo><mi>x</mi></mrow></math>"
+       "<p>We hypothesize that it is easier to optimize this residual mapping than the original, and that in the limit a deeper model should be no worse than its shallower counterpart.</p>"))
+
+(def ^:private act-issue-html
+  (str "<p class='lead'>A grab bag of links, half-formed theories, and one genuinely good chart. As always, reply if you think I'm wrong — you usually are, and the corrections are the best part of my week.</p>"
+       "<h2>Links worth your time</h2>"
+       "<ul>"
+       "<li><a href='https://example.com/forecasting'>Why expert forecasts converge right before they fail</a> — better than its title.</li>"
+       "<li><a href='https://example.com/cities'>Notes on why some cities feel alive at street level and others feel embalmed.</a></li>"
+       "<li><a href='https://example.com/sleep'>The sleep-study replication everyone is arguing about,</a> with the caveats put back in.</li>"
+       "</ul>"
+       "<h2>One chart</h2>"
+       "<p>If the trend holds, the line keeps going up and to the right, which is either very good or very bad depending on what you believe the y-axis measures. I lean optimistic. I usually do.</p>"))
+
+;; Inputs for the live jobs (seed-live-jobs!). The external targets are chosen to
+;; be stable, paywall- and JS-free, and OpenAlex-indexed, so the smoke test runs
+;; reliably on every seed; they're easy to swap if one ever rots.
+
+(def ^:private test-inbox-alias "test+1@inbox.reader.test")
+
+(def ^:private live-article-url
+  ;; Paul Graham's essays are static HTML, stable for years — a dependable target
+  ;; for the :extract-article fetch+extract smoke test.
+  "https://paulgraham.com/greatwork.html")
+
+(def ^:private live-paper-ref
+  ;; A real, OpenAlex-indexed arXiv paper (BERT), distinct from the direct-seeded
+  ;; papers so it gets its own live :extract-paper fetch rather than being skipped
+  ;; as already-extracted.
+  {:kind :arxiv :id "1810.04805"})
+
+(def ^:private sample-newsletter-eml
+  "A minimal RFC822 newsletter for the :ingest-email smoke test. inbound/deliver!
+   stores these bytes and enqueues the same job the prod webhook does; the worker
+   parses the .eml and records an issue on the test user's queue, exercising the
+   whole inbound path (storage read + MIME parse + sanitize + queue)."
+  (str/join "\r\n"
+            ["From: Astral Codex Ten <newsletter@astralcodexten.test>"
+             (str "To: " test-inbox-alias)
+             "Subject: ACT: a fresh batch of links"
+             "Date: Thu, 19 Jun 2026 09:00:00 -0700"
+             "Message-ID: <seed-act-2026-w25@astralcodexten.test>"
+             "List-Unsubscribe: <https://astralcodexten.test/unsubscribe>"
+             "MIME-Version: 1.0"
+             "Content-Type: text/html; charset=UTF-8"
+             ""
+             (str "<h1>Links for the week</h1>"
+                  "<p>Delivered straight to the reader inbox and parsed from a real .eml, "
+                  "so the inbound pipeline gets exercised on every dev seed.</p>"
+                  "<ul><li><a href='https://example.com/a'>Something worth reading</a></li>"
+                  "<li><a href='https://example.com/b'>And another</a></li></ul>")]))
 
 (defn- assert-local-url!
   "Throw unless `url` points at a local Postgres. `seed-in-tx!` opens with
@@ -82,7 +190,8 @@
                                  :canonical-url     "https://www.newyorker.com/the-white-album"
                                  :word-count        5200
                                  :reading-time-secs 1560
-                                 :abstract          "On living in California in the late sixties."})
+                                 :abstract          "On living in California in the late sixties."
+                                 :body-html         white-album-html})
         slouching (crud/create! tx :articles
                                 {:affiliation-id    (:affiliations/id ny)
                                  :title             "Slouching Towards Bethlehem"
@@ -90,7 +199,8 @@
                                  :canonical-url     "https://www.newyorker.com/slouching-towards-bethlehem"
                                  :word-count        7100
                                  :reading-time-secs 2130
-                                 :abstract          "A portrait of the Haight-Ashbury in 1967."})
+                                 :abstract          "A portrait of the Haight-Ashbury in 1967."
+                                 :body-html         slouching-html})
         marvin    (crud/create! tx :articles
                                 {:affiliation-id    (:affiliations/id ny)
                                  :title             "The Search for Marvin Gardens"
@@ -98,7 +208,8 @@
                                  :canonical-url     "https://www.newyorker.com/the-search-for-marvin-gardens"
                                  :word-count        6400
                                  :reading-time-secs 1920
-                                 :abstract          "Monopoly, Atlantic City, and the board behind the game."})
+                                 :abstract          "Monopoly, Atlantic City, and the board behind the game."
+                                 :body-html         marvin-html})
 
         attention (crud/create! tx :papers
                                 {:affiliation-id (:affiliations/id arxiv)
@@ -106,19 +217,21 @@
                                  :doi            "10.48550/arXiv.1706.03762"
                                  :arxiv-id       "1706.03762"
                                  :abstract       "The Transformer architecture."
-                                 :pdf-object-key "papers/1706.03762.pdf"})
+                                 :pdf-object-key "papers/1706.03762.pdf"
+                                 :body-html      attention-html})
         resnet    (crud/create! tx :papers
                                 {:affiliation-id (:affiliations/id arxiv)
                                  :title          "Deep Residual Learning for Image Recognition"
                                  :doi            "10.48550/arXiv.1512.03385"
                                  :arxiv-id       "1512.03385"
                                  :abstract       "Residual connections for very deep networks."
-                                 :pdf-object-key "papers/1512.03385.pdf"})
+                                 :pdf-object-key "papers/1512.03385.pdf"
+                                 :body-html      resnet-html})
 
         issue     (crud/create! tx :newsletter-issues
                                 {:affiliation-id       (:affiliations/id act-nl)
                                  :subject              "ACT links for the week"
-                                 :body-html            "<h1>This week</h1><p>…</p>"
+                                 :body-html            act-issue-html
                                  :raw-email-object-key "issues/act-2026-W21.eml"})
 
         ;; Users. test@example.com is the dev login (the lone address allowlisted
@@ -168,7 +281,7 @@
                              :contribution-type "guest"})
 
     ;; Inboxes.
-    (crud/create! tx :email-inboxes {:user-id (:users/id test-user) :alias "test+1@inbox.reader.test"})
+    (crud/create! tx :email-inboxes {:user-id (:users/id test-user) :alias test-inbox-alias})
     (crud/create! tx :email-inboxes {:user-id (:users/id marcus)    :alias "marcus+1@inbox.reader.test"})
 
     ;; Queues. Both users have several items, and they SHARE two readables — the
@@ -184,18 +297,52 @@
     (queue! tx marcus "paper"          (:papers/id attention)   "unread"  {:source "import"})
     (queue! tx marcus "paper"          (:papers/id resnet)      "read"    {:source "import"})
 
-    ;; A few durable jobs in flight.
-    (jobs/enqueue! tx "thumbnails"    {:article-id (str (:articles/id white))})
-    (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id attention))})
-    (jobs/enqueue! tx "extract-paper" {:paper-id   (str (:papers/id resnet))})))
+    ;; Durable jobs for the admin dashboard. The library papers above carry their
+    ;; bodies already, so each one's :extract-paper job is recorded as `done` with
+    ;; the real payload shape — the worker only polls `pending`, so these never
+    ;; re-run. (The live :extract-paper job that actually hits the network is set
+    ;; up in seed-live-jobs!.) A lone pending thumbnails job (no dev handler)
+    ;; stands in for work still queued.
+    (jobs/enqueue! tx "thumbnails" {:article-id (str (:articles/id white))})
+    (crud/create! tx :jobs {:queue-name "extract-paper"
+                            :payload    {:paper-id (str (:papers/id attention)) :kind "arxiv" :id "1706.03762"}
+                            :state      "done"
+                            :attempts   1})
+    (crud/create! tx :jobs {:queue-name "extract-paper"
+                            :payload    {:paper-id (str (:papers/id resnet)) :kind "arxiv" :id "1512.03385"}
+                            :state      "done"
+                            :attempts   1})
 
-(defn seed! [ds]
+    ;; Returned so seed! can target the live jobs at the dev login's queue + inbox.
+    test-user))
+
+(defn- seed-live-jobs!
+  "Drive one real job of each type through its production entry point, so the dev
+   worker exercises the whole pipeline on every seed — where a broken handler or a
+   drifted payload first surfaces (a malformed enqueue used to fail only in the
+   worker log). Unlike the direct-seeded library, these create fresh placeholders
+   the worker fills over the network (paper, article) or an inbound issue it
+   records from a parsed .eml (email). Enqueue-only: the jobs run when a worker is
+   present (dev/prod) and simply sit pending under tests. Runs after the library
+   commits, against the real datasource, so the worker sees fully-seeded data."
+  [ds store user-id]
+  (papers/start! ds user-id live-paper-ref)
+  (ingest/start! ds user-id live-article-url)
+  (inbound/deliver! ds store test-inbox-alias (.getBytes ^String sample-newsletter-eml "UTF-8")))
+
+(defn seed!
+  "Populate the dev database: a direct-seeded library of already-extracted
+   readables (instant content for the UI) plus one real job of each type for the
+   worker to run (`seed-live-jobs!`). `store` backs the inbound-email job — the
+   file store in dev, the in-memory one under tests."
+  [ds store]
   (log/info "seed starting")
   (assert-local-db! ds)
-  ;; One outer transaction so a partial failure rolls the whole seed
-  ;; back. `:ignore` makes the inner `with-transaction` in
-  ;; `authorships/attach!` join us instead of throwing on a nested tx.
-  (binding [next.jdbc.transaction/*nested-tx* :ignore]
-    (jdbc/with-transaction [tx ds]
-      (seed-in-tx! tx)))
+  ;; One outer transaction so a partial failure rolls the whole library back.
+  ;; `:ignore` makes the inner `with-transaction` in `authorships/attach!` join us
+  ;; instead of throwing on a nested tx.
+  (let [test-user (binding [next.jdbc.transaction/*nested-tx* :ignore]
+                    (jdbc/with-transaction [tx ds]
+                      (seed-in-tx! tx)))]
+    (seed-live-jobs! ds store (:users/id test-user)))
   (log/info "seed done"))

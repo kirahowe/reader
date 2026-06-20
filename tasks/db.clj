@@ -9,7 +9,8 @@
 (def ^:private seed-expr
   "(do (require 'reader.dev.seed 'integrant.repl.state)
        (reader.dev.seed/seed!
-         (:reader.db/datasource integrant.repl.state/system))
+         (:reader.db/datasource integrant.repl.state/system)
+         (:reader.storage/store integrant.repl.state/system))
        :seeded)")
 
 (def ^:private force-flags #{"--yes" "-y" "--force"})

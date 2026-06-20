@@ -34,7 +34,7 @@
   (with-system [system]
     (let [ds      (:reader.db/datasource system)
           handler (:reader.concerns.reitit/ring-handler system)]
-      (seed/seed! ds)
+      (seed/seed! ds (:reader.storage/store system))
       ;; Home is the signed-in user's queue, not the global catalog. Provision the
       ;; test user (first authed request), then queue the seeded readables for them
       ;; so the page has something to render.
@@ -221,7 +221,7 @@
   (with-system [system]
     (let [ds      (:reader.db/datasource system)
           handler (:reader.concerns.reitit/ring-handler system)]
-      (seed/seed! ds)
+      (seed/seed! ds (:reader.storage/store system))
       ;; Provision the test user (allowed@x.test — distinct from the seeded users,
       ;; so its queue starts empty), then queue one readable of each type for it.
       (-> (mock/request :get "/") test-auth/authed handler)
@@ -241,7 +241,8 @@
             (is (re-find #"The White Album" body) "the title shows")
             (is (re-find #"Joan Didion" body) "the byline shows")
             (is (re-find #"The New Yorker" body) "the source shows")
-            (is (re-find #"(?i)not available in the reader" body) "the placeholder body shows")
+            (is (re-find #"the center did not hold" body) "the extracted body renders")
+            (is (not (re-find #"(?i)not available in the reader" body)) "not the placeholder")
             (is (re-find #"newyorker\.com/the-white-album" body) "links to the original")
             (is (re-find #"action=\"/queue/[^\"]+/read\"" body) "a mark-read control is present"))
           (let [row (crud/by-id ds :queue-items qa)]
@@ -259,7 +260,7 @@
           (let [{:keys [status body]} (GET (str "/queue/" qn))]
             (is (= 200 status))
             (is (re-find #"ACT links for the week" body) "the subject shows")
-            (is (re-find #"This week" body) "the sanitized newsletter body renders")
+            (is (re-find #"grab bag of links" body) "the sanitized newsletter body renders")
             (is (not (re-find #"(?i)not available in the reader" body)) "not the placeholder")))
 
         (testing "POST /queue/:id/read marks it read and stays on the reader view"

@@ -17,7 +17,7 @@ flowchart TB
   end
 
   subgraph cloudflare["Cloudflare edge"]
-    emailrt["Email Routing<br/><i>aged-morning-k3f9x2@themiscellany.app</i>"]
+    emailrt["Email Routing<br/><i>aged-morning-k3f9@themiscellany.app</i>"]
     worker["Email-Routing Worker<br/><i>stores .eml, signs + forwards</i>"]
     r2[("R2<br/><i>raw .eml blobs</i>")]
   end
@@ -206,7 +206,7 @@ sequenceDiagram
   participant J as jobs worker
   participant DB as Postgres (Neon)
 
-  E->>CR: SMTP to aged-morning-k3f9x2@themiscellany.app
+  E->>CR: SMTP to aged-morning-k3f9@themiscellany.app
   CR->>CW: raw email
   CW->>R: PUT raw .eml (object key)
   CW->>H: POST /api/inbound (HMAC-signed notification)

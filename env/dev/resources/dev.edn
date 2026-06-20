@@ -44,9 +44,9 @@
  ;; The seeded test user can see the eval dashboard in dev.
  :reader.handlers.admin/extractions {:admin-emails #{"test@example.com"}}
 
- ;; Placeholder inbound-email domain for dev — no mail is actually received
- ;; until the Cloudflare worker + a real domain land (Slice 5).
- :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}
+ ;; Placeholder inbound-email domain for dev — the :direct receiver below takes
+ ;; injected .eml, but no real mail is delivered (no Cloudflare worker / domain).
+ :reader.inbound/domain "inbox.reader.test"
 
  ;; Dev receives inbound email directly: POST a raw .eml to /api/inbound?alias=…
  ;; (no HMAC/worker/R2). Open on localhost; set :token for a reachable tenant.

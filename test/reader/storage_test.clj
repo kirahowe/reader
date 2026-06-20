@@ -41,6 +41,13 @@
     (is (thrown? clojure.lang.ExceptionInfo (storage/get-object store "k")))
     (is (thrown? clojure.lang.ExceptionInfo (storage/put-object store "k" (.getBytes "x" "UTF-8") "text/plain")))))
 
+(deftest enabled?-reflects-whether-the-backend-is-configured
+  (testing "the working stand-ins are enabled"
+    (is (storage/enabled? (storage/memory-store)))
+    (is (storage/enabled? (storage/file-store (temp-dir)))))
+  (testing "an unconfigured backend is disabled (feature inert, not an error)"
+    (is (not (storage/enabled? (storage/disabled-store :r2-unconfigured))))))
+
 (deftest open-selects-backend
   (testing "the :memory backend opens a working Blobs store"
     (let [store (storage/open {:backend :memory})]

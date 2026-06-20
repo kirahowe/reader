@@ -310,8 +310,10 @@ do it — and watch the rollout with `flyctl logs`.
 ### Inbound email (newsletters)
 
 Newsletters reach a user's queue by being emailed to their alias (a friendly
-but unguessable name like `aged-morning-k3f9x2@<your-domain>`, shown on
-`/settings`). The path is: Cloudflare
+but unguessable name like `aged-morning-k3f9@<your-domain>`, shown on
+`/settings`, where it can also be rotated — retype the current address to mint a
+fresh one and immediately retire the old, e.g. once an address starts attracting
+spam). The path is: Cloudflare
 Email Routing → an Email Worker that writes the raw `.eml` to R2 and POSTs a
 signed notification to `POST /api/inbound` → the `:ingest-email` job parses
 and files it. The app can't be an MX itself, so this bridge is required (see

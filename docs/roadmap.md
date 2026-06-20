@@ -187,8 +187,15 @@ worker, no domain needed):**
 - `reader.storage` — a `Blobs` abstraction (`:reader.storage/store`), in-memory
   stub in dev/test, R2 in prod. Mirrors embedded-postgres-for-Neon.
 - Per-user `email_inboxes` alias — a friendly haikunator name plus a random
-  token (`aged-morning-k3f9x2@<domain>`), provisioned idempotently (with
-  collision-retry on the unique index) and surfaced on `/settings`.
+  token (`aged-morning-k3f9@<domain>`), provisioned idempotently (with
+  collision-retry on the unique index) and surfaced on `/settings`, where it can
+  also be rotated (`POST /settings/rotate`): retire the old address and mint a
+  fresh one, behind a type-to-confirm guard since the old alias stops resolving
+  immediately.
+- `/settings` reports real liveness, not a hand-set flag: the "not receiving
+  mail yet" note is derived from config (`:reader.inbound/active?` — the webhook
+  HMAC secret is set *and* blob storage is configured), so it clears
+  automatically wherever inbound email is actually wired.
 - `POST /api/inbound` — public but HMAC-signed (`reader.web.signature`):
   constant-time verify over `timestamp + body`, 5-minute replay window,
   Malli-validated payload, resolves the alias to a user, enqueues

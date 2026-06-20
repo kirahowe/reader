@@ -15,6 +15,6 @@
 
  :reader.handlers.auth/login {:api-url "https://test.invalid"}
 
- :reader.handlers.settings/show {:inbound-domain "inbox.reader.test"}
+ :reader.inbound/domain "inbox.reader.test"
 
  :reader.handlers/inbound {:impl :direct :storage #ig/ref :reader.storage/store}}

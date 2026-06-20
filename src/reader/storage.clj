@@ -19,7 +19,11 @@
   (get-object [store key]
     "The bytes stored under `key` (a byte array), or nil if there's no such object.")
   (put-object [store key ^bytes bytes content-type]
-    "Store `bytes` under `key` with `content-type`. Returns `key`."))
+    "Store `bytes` under `key` with `content-type`. Returns `key`.")
+  (enabled? [store]
+    "True when this store can actually read/write; false for a placeholder whose
+     backend isn't configured. Lets a caller report a feature as inert (e.g. the
+     settings page noting inbound email isn't wired) without attempting an op."))
 
 ;; ── in-memory (tests) ────────────────────────────────────────────────────
 
@@ -28,7 +32,8 @@
   (get-object [_ key] (:bytes (get @objects key)))
   (put-object [_ key bytes content-type]
     (swap! objects assoc key {:bytes bytes :content-type content-type})
-    key))
+    key)
+  (enabled? [_] true))
 
 (defn memory-store
   "An in-memory Blobs store backed by an atom. For dev, tests, and seeding."
@@ -49,7 +54,8 @@
     (let [f (io/file root key)]
       (io/make-parents f)
       (with-open [out (io/output-stream f)] (.write out ^bytes bytes))
-      key)))
+      key))
+  (enabled? [_] true))
 
 (defn file-store
   "A Blobs store rooted at directory `root` (created if absent)."
@@ -65,7 +71,8 @@
 (deftype DisabledStore [reason]
   Blobs
   (get-object [_ _] (throw (ex-info "blob storage is not configured" {:reason reason})))
-  (put-object [_ _ _ _] (throw (ex-info "blob storage is not configured" {:reason reason}))))
+  (put-object [_ _ _ _] (throw (ex-info "blob storage is not configured" {:reason reason})))
+  (enabled? [_] false))
 
 (defn disabled-store
   "A store that throws on use — for an optional backend whose config is absent,

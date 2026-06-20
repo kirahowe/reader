@@ -59,8 +59,8 @@
  ;; The webhook's shared HMAC secret (same value as the Worker's Wrangler
  ;; secret); the handler fails closed when it's unset. Alias domain defaults to
  ;; the registered domain, overridable via the env var.
- :reader.handlers/inbound        {:impl :webhook :hmac-secret #env/opt "INBOUND_HMAC_SECRET"}
- :reader.handlers.settings/show  {:inbound-domain #env/opt ["INBOUND_EMAIL_DOMAIN" "themiscellany.app"]}
+ :reader.handlers/inbound {:impl :webhook :hmac-secret #env/opt "INBOUND_HMAC_SECRET"}
+ :reader.inbound/domain   #env/opt ["INBOUND_EMAIL_DOMAIN" "themiscellany.app"]
 
  ;; Background worker draining the ingest jobs (manual URL + inbound email).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator

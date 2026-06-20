@@ -1,12 +1,12 @@
 (ns reader.domain.inboxes
   "Per-user inbound email aliases. Each user has a friendly-but-unguessable alias
    address — a haikunator `adjective-noun` name plus a random token, e.g.
-   `aged-morning-k3f9x2@themiscellany.app`. Newsletters forwarded to it land in
+   `aged-morning-k3f9@themiscellany.app`. Newsletters forwarded to it land in
    that user's queue (wired by the inbound webhook + :ingest-email job).
 
    The alias is a capability — knowing it lets a sender reach the queue — so the
    words are just for memorability; the unguessability comes from the SecureRandom
-   token suffix (~31 bits on top of the word pair), never from identity. The
+   token suffix (~21 bits on top of the word pair), never from identity. The
    stored alias is the full `name@domain` recipient address, so the inbound
    webhook can match an incoming recipient against it directly."
   (:require [haikunator :refer [haikunate]]
@@ -16,7 +16,9 @@
 (defonce ^:private rng (SecureRandom.))
 
 (def ^:private token-alphabet "0123456789abcdefghijklmnopqrstuvwxyz")
-(def ^:private token-length 6)
+;; 4 base36 chars (~21 bits) on top of the word pair — short to type, still
+;; unguessable at our scale. Bump back up if the collision-retry starts firing.
+(def ^:private token-length 4)
 (def ^:private max-attempts 5)
 
 (defn- secure-token
@@ -29,13 +31,13 @@
 
 (defn gen-alias
   "A friendly-but-unguessable recipient address at `domain`, e.g.
-   `aged-morning-k3f9x2@themiscellany.app`: a haikunator word pair plus a
+   `aged-morning-k3f9@themiscellany.app`: a haikunator word pair plus a
    SecureRandom token."
   [domain]
   (str (haikunate {:token-length 0}) "-" (secure-token token-length) "@" domain))
 
-(defn- for-user
-  "The user's existing inbox row, or nil. Tolerant of more than one (a rare
+(defn current
+  "The user's current inbox row, or nil. Tolerant of more than one (a rare
    provisioning race could leave duplicates, all routing to the same user);
    returns the earliest so the displayed address stays stable."
   [ds user-id]
@@ -67,8 +69,21 @@
    `domain` is the configured inbound-email domain; the stored alias is the full
    `name@domain` address newsletters are forwarded to."
   [ds user-id domain]
-  (or (for-user ds user-id)
+  (or (current ds user-id)
       (provision! ds user-id domain)))
+
+(defn rotate!
+  "Retire all of `user-id`'s current alias rows and mint a fresh one at `domain`,
+   returning the new row. The old alias stops resolving immediately, so mail to it
+   is refused — the point of rotating. Deliberately not one transaction:
+   `provision!` recovers from a (vanishingly rare) alias collision by retrying a
+   fresh INSERT, which an aborted transaction would forbid; and deleting before
+   provisioning means a mid-failure leaves no row, which the next visit self-heals
+   via `find-or-provision!` rather than showing a half-dead alias."
+  [ds user-id domain]
+  (doseq [{:email-inboxes/keys [id]} (crud/find-many ds :email-inboxes {:user-id user-id})]
+    (crud/delete! ds :email-inboxes id))
+  (provision! ds user-id domain))
 
 (defn by-alias
   "The inbox row for a full recipient `address`, or nil — how the inbound webhook

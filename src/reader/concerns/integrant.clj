@@ -18,6 +18,11 @@
 ;; constant so the path is configured per-profile, never hardcoded in code.
 (derive :reader.storage/file-root :reader/const)
 
+;; The inbound-email domain — the host part of every user's alias. A plain EDN
+;; constant so the settings show + rotate handlers share one per-profile value
+;; (they must mint at the same domain) instead of duplicating the override.
+(derive :reader.inbound/domain :reader/const)
+
 ;; ---------- EDN reader literals ----------
 
 (defrecord Secret [value]

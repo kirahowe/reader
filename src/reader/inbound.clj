@@ -4,7 +4,9 @@
    notification to an :ingest-email job for the addressed user. Signature
    verification lives in reader.web.signature; this is the payload + freshness +
    enqueue logic, kept out of the HTTP handler."
-  (:require [malli.core :as m]
+  (:require [clojure.string :as str]
+            [integrant.core :as ig]
+            [malli.core :as m]
             [reader.domain.inboxes :as inboxes]
             [reader.jobs :as jobs]
             [reader.storage :as storage]))
@@ -55,3 +57,13 @@
       (storage/put-object store k raw-bytes "message/rfc822")
       (jobs/enqueue! ds "ingest-email"
                      {:user-id (str (:email-inboxes/user-id inbox)) :r2-key k}))))
+
+;; ── liveness, derived from config (for the settings UI) ───────────────────
+
+(defmethod ig/init-key :reader.inbound/active?
+  [_ {:keys [hmac-secret storage]}]
+  ;; Inbound email is live only where the webhook's HMAC secret is set and blob
+  ;; storage is configured — both prerequisites for a delivered .eml.
+  (boolean (and (not (str/blank? (str hmac-secret)))
+                storage
+                (storage/enabled? storage))))

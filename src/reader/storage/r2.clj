@@ -43,7 +43,8 @@
                                              :Body bytes :ContentType content-type}})]
       (when (anomaly? resp)
         (throw (ex-info "R2 put-object failed" {:key key :response resp})))
-      key)))
+      key))
+  (enabled? [_] true))
 
 (defn ->store
   "An R2-backed Blobs store. `cfg` needs :account-id :bucket :access-key :secret;

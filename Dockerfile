@@ -21,5 +21,12 @@ EXPOSE 8080
 # Split so Fly's release_command (which Fly runs as ENTRYPOINT + release_command,
 # replacing CMD) becomes `java … reader.migrate prod.edn` rather than extra args
 # to reader.main. See fly.toml [deploy] release_command.
-ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar"]
+#
+# Cold-start flags (the machine scales to zero, so boot-to-listen is on the
+# request path): SerialGC has the smallest footprint and spawns no GC threads to
+# contend with the app on a single shared vCPU; TieredStopAtLevel=1 caps JIT at
+# C1, skipping the C2 compiler threads during boot. Both trade peak throughput
+# for faster startup — the right call for a low-traffic, scale-to-zero app. They
+# must stay before -cp so the JVM prefix is unchanged for release_command.
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-cp", "/app/conf:/app/reader.jar"]
 CMD ["reader.main", "prod.edn"]

@@ -30,4 +30,6 @@ primary_region = "yyz"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  # 1gb gives the JVM headroom for a Clojure app's metaspace + code cache; 512mb
+  # was tight. Flat cost, and we keep min_machines_running = 0 (scale to zero).
+  memory = "1gb"

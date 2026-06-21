@@ -8,9 +8,11 @@
    NOT for user-supplied URLs: there is no SSRF guard here because every caller
    targets a hardcoded host. Anything fetched from a pasted/redirecting URL must
    go through reader.ingest.fetch's SSRF-pinned client instead."
-  (:require [org.httpkit.client :as http]))
+  (:require [charred.api :as json]
+            [org.httpkit.client :as http]))
 
 (def ^:private timeout-ms 10000)
+(def ^:private post-timeout-ms 30000)
 (def ^:private user-agent "Reader/1.0 (+https://themiscellany.app)")
 
 (defn request!
@@ -26,3 +28,23 @@
                  :headers {"User-Agent" user-agent}}
                 (fn [{:keys [status body error]}]
                   {:status status :body body :error error})))
+
+(defn post!
+  "Async POST `url` with `body` serialized to JSON. `opts` may set :headers
+   (merged over the JSON defaults) and :timeout-ms (default 30s — model calls run
+   longer than the metadata fetches `request!` serves). Returns a promise
+   delivering {:status :body :error}, the same shape as `request!`. Same
+   trusted-host caveat as the rest of this namespace — not for user-supplied URLs."
+  ([url body] (post! url body {}))
+  ([url body {:keys [headers timeout-ms] :or {timeout-ms post-timeout-ms}}]
+   (http/request {:url     url
+                  :method  :post
+                  :as      :text
+                  :timeout timeout-ms
+                  :headers (merge {"User-Agent"   user-agent
+                                   "Content-Type" "application/json"
+                                   "Accept"       "application/json"}
+                                  headers)
+                  :body    (json/write-json-str body)}
+                 (fn [{:keys [status body error]}]
+                   {:status status :body body :error error}))))

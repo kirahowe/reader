@@ -3,7 +3,6 @@
    -> dedup -> persist baseline + embedding + eval event, against embedded
    Postgres. The model edges are stubbed; everything else is real."
   (:require [clojure.test :refer [deftest is testing]]
-            [integrant.core :as ig]
             [reader.db.crud :as crud]
             [reader.ingest.tag-job :as job]
             [reader.test-support.setup :refer [with-system]]))
@@ -77,15 +76,14 @@
         (is (empty? (crud/find-many ds :readable-tags {:readable-id aid})))
         (is (empty? (crud/find-many ds :readable-embeddings {:readable-id aid})))))))
 
-(deftest handler-skips-when-no-model-configured-test
+(deftest skip-readable!-records-and-reschedules-test
   (with-system [system]
-    (let [ds      (:reader.db/datasource system)
-          aid     (:articles/id (seed-article ds))
-          ;; require-model? with neither tagger nor embed wired = the prod
-          ;; pre-secrets state: skip rather than write stub tags to the baseline.
-          handler (ig/init-key :reader.ingest.tag-job/handler
-                               {:require-model? true :skip-retry-secs 900})]
-      (handler ds {:readable-type "article" :readable-id (str aid)})
+    (let [ds  (:reader.db/datasource system)
+          aid (:articles/id (seed-article ds))]
+      ;; The pre-secrets state: no real model wired, so the handler delegates here
+      ;; (require-model? + nothing live) rather than write stub tags to the shared
+      ;; baseline.
+      (job/skip-readable! ds {:readable-type "article" :readable-id (str aid)} 900)
       (testing "records a :skipped event and writes no baseline or embedding"
         (is (= "skipped" (:tagging-events/outcome (crud/find-1 ds :tagging-events {:readable-id aid}))))
         (is (empty? (crud/find-many ds :readable-tags {:readable-id aid})))

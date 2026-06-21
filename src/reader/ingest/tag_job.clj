@@ -41,6 +41,42 @@
   (let [s (->> [title abstract text] (remove nil?) (str/join ". "))]
     (subs s 0 (min (count s) 2000))))
 
+(defn- require-content
+  "The readable's model signal, or a fatal error when it's gone — a missing
+   readable can't be retried into existence."
+  [ds readable-type readable-id]
+  (or (content-for ds readable-type readable-id)
+      (throw (ex-info "readable not found for tagging"
+                      {:error-class :missing-readable :fatal? true}))))
+
+(defn- coerce+validate
+  "Coerce the (possibly remote) tagger's raw output to the tag schema and assert
+   its contract, returning the result or throwing a fatal violation."
+  [raw]
+  (let [result (tag/coerce raw)]
+    (when-not (tag/valid? result)
+      (throw (ex-info "infer-tags violated its contract"
+                      {:error-class :invalid-tags :fatal? true
+                       :explain     (tag/explain result)})))
+    result))
+
+(defn- elapsed-ms [t0]
+  (quot (- (System/nanoTime) t0) 1000000))
+
+(defn- record-failure!
+  "Record a :failed eval event for a tagging error. Its own insert must never
+   mask the real error, so a recording failure is logged and swallowed (mirrors
+   reader.ingest/extract-article!)."
+  [ds readable-type readable-id t]
+  (try
+    (events/record! ds {:readable-type readable-type
+                        :readable-id   readable-id
+                        :outcome       :failed
+                        :error-class   (or (:error-class (ex-data t)) :unknown)})
+    (catch Throwable e
+      (log/error e "failed to record tagging failure event"
+                 {:readable-type readable-type :readable-id readable-id}))))
+
 (defn tag-readable!
   "Job handler: infer + persist tags for a readable, plus its embedding and an
    eval event. Deps: {:infer-tags fn, :embed fn, :threshold, :embed-model}.
@@ -50,54 +86,35 @@
    missing-readable and contract-violation cases are fatal (no retry). Payload
    ids arrive as strings (jsonb drops uuid types)."
   [ds {:keys [readable-type readable-id]} {:keys [infer-tags embed threshold embed-model]}]
-  (let [readable-id (parse-uuid (str readable-id))
-        t0          (System/nanoTime)]
+  (let [readable-id (parse-uuid (str readable-id))]
     (try
-      (let [content (content-for ds readable-type readable-id)]
-        (when-not content
-          (throw (ex-info "readable not found for tagging"
-                          {:error-class :missing-readable :fatal? true})))
-        (let [existing  (mapv :label (tags/vocabulary ds))
-              result    (tag/coerce (infer-tags content existing))
-              _         (when-not (tag/valid? result)
-                          (throw (ex-info "infer-tags violated its contract"
-                                          {:error-class :invalid-tags :fatal? true
-                                           :explain     (tag/explain result)})))
-              proposals (:tags result)
-              ;; One embed call: the readable doc first, then each proposed label.
-              vectors   (embed (cons (doc-text content) (map :label proposals)))
-              doc-vec   (first vectors)
-              label-vec (rest vectors)
-              duration  (long (/ (- (System/nanoTime) t0) 1000000))]
-          (jdbc/with-transaction [tx ds]
-            (let [entries     (tags/resolve-tags! tx threshold
-                                                  (map (fn [p e] {:label (:label p) :embedding e})
-                                                       proposals label-vec))
-                  assignments (map (fn [entry p] {:tag-id (:id entry) :confidence (:confidence p)})
-                                   entries proposals)]
-              (tags/set-baseline! tx readable-type readable-id assignments)
-              (tags/set-readable-embedding! tx readable-type readable-id doc-vec embed-model)
-              (events/record! tx {:readable-type readable-type
-                                  :readable-id   readable-id
-                                  :outcome       :done
-                                  :model         (:model result)
-                                  :tag-count     (count assignments)
-                                  :duration-ms   duration
-                                  :provenance    {:labels    (mapv :label proposals)
-                                                  :vocab-size (count existing)}})
-              result))))
+      (let [t0        (System/nanoTime)
+            content   (require-content ds readable-type readable-id)
+            existing  (mapv :label (tags/vocabulary ds))
+            result    (coerce+validate (infer-tags content existing))
+            proposals (:tags result)
+            ;; One embed call: the readable doc first, then each proposed label.
+            [doc-vec & label-vecs] (embed (cons (doc-text content) (map :label proposals)))
+            duration  (elapsed-ms t0)]
+        (jdbc/with-transaction [tx ds]
+          (let [entries (tags/resolve-tags! tx threshold
+                                            (map (fn [p v] {:label (:label p) :embedding v})
+                                                 proposals label-vecs))]
+            (tags/set-baseline! tx readable-type readable-id
+                                (map (fn [entry p] {:tag-id (:id entry) :confidence (:confidence p)})
+                                     entries proposals))
+            (tags/set-readable-embedding! tx readable-type readable-id doc-vec embed-model)
+            (events/record! tx {:readable-type readable-type
+                                :readable-id   readable-id
+                                :outcome       :done
+                                :model         (:model result)
+                                :tag-count     (count proposals)
+                                :duration-ms   duration
+                                :provenance    {:labels     (mapv :label proposals)
+                                                :vocab-size (count existing)}})
+            result)))
       (catch Throwable t
-        ;; The failure event isn't tied to the rolled-back write, but its own
-        ;; insert must never mask the real error — log and swallow a recording
-        ;; failure (mirrors reader.ingest/extract-article!).
-        (try
-          (events/record! ds {:readable-type readable-type
-                              :readable-id   readable-id
-                              :outcome       :failed
-                              :error-class   (or (:error-class (ex-data t)) :unknown)})
-          (catch Throwable e
-            (log/error e "failed to record tagging failure event"
-                       {:readable-type readable-type :readable-id readable-id})))
+        (record-failure! ds readable-type readable-id t)
         (throw t)))))
 
 (defn skip-readable!

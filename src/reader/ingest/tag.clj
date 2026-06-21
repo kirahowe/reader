@@ -35,12 +35,13 @@
 (def ^:private max-tags 12)
 (def ^:private max-label-len 60)
 
+(defn- truncate [s n] (when s (subs s 0 (min (count s) n))))
+
 (defn- clamp-label
   "Normalize a proposed label: trimmed, lowercased, <=60 chars, or nil if blank.
    Lowercasing keeps the vocabulary from forking on case alone."
   [s]
-  (some-> s str str/trim not-empty str/lower-case
-          (as-> l (subs l 0 (min (count l) max-label-len)))))
+  (some-> s str str/trim not-empty str/lower-case (truncate max-label-len)))
 
 (defn- clamp-conf [c]
   (-> (if (number? c) (double c) 1.0) (max 0.0) (min 1.0)))
@@ -59,8 +60,6 @@
                   (or tags [])))))
 
 ;; ── prompt + parse (pure) ────────────────────────────────────────────────
-
-(defn- truncate [s n] (when s (subs s 0 (min (count s) n))))
 
 (defn system-prompt
   "The classifier instruction, with the existing vocabulary inlined so the model

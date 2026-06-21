@@ -64,6 +64,27 @@
 
 (defn- ms [t0 t1] (long (/ (- t1 t0) 1000000)))
 
+(defn- validated-entities
+  "Coerce the entity-extraction output to the schema and assert its contract,
+   returning the entities or throwing a fatal violation."
+  [raw]
+  (let [entities (schema/coerce-entities raw)]
+    (when-not (schema/valid-entities? entities)
+      (throw (ex-info "entity extraction violated its contract"
+                      {:error-class :invalid-entities :fatal? true
+                       :explain     (schema/explain-entities entities)})))
+    entities))
+
+(defn- record-failure!
+  "Record a :failed extraction event for an error. Its own insert must never mask
+   the real error, so a recording failure is logged and swallowed."
+  [ds url t]
+  (try
+    (events/record! ds {:url url :outcome :failed
+                        :error-class (or (:error-class (ex-data t)) :unknown)})
+    (catch Throwable e
+      (log/error e "failed to record extraction failure event" {:url url}))))
+
 (defn extract-article!
   "Job handler: fetch `url`, extract body + entities, finalize the placeholder
    article `:article-id`, and record an extraction event. `:fetch-fn` and
@@ -77,12 +98,7 @@
           {:keys [html final-url]} (fetch-fn url)
           t1                       (System/nanoTime)
           ex                       (extract/extract html (or final-url url))
-          ent                      (let [e (schema/coerce-entities (extract-entities ex))]
-                                     (when-not (schema/valid-entities? e)
-                                       (throw (ex-info "entity extraction violated its contract"
-                                                       {:error-class :invalid-entities :fatal? true
-                                                        :explain     (schema/explain-entities e)})))
-                                     e)
+          ent                      (validated-entities (extract-entities ex))
           t2                       (System/nanoTime)]
       (jdbc/with-transaction [tx ds]
         (finalize! tx (parse-uuid (str article-id)) ex ent)
@@ -90,13 +106,7 @@
                             :durations {:fetch-ms (ms t0 t1) :extract-ms (ms t1 t2)}}))
       ent)
     (catch Throwable t
-      ;; The failure event isn't tied to a rolled-back write, but its own insert
-      ;; must never mask the real error — log and swallow a recording failure.
-      (try
-        (events/record! ds {:url url :outcome :failed
-                            :error-class (or (:error-class (ex-data t)) :unknown)})
-        (catch Throwable e
-          (log/error e "failed to record extraction failure event" {:url url})))
+      (record-failure! ds url t)
       (throw t))))
 
 ;; ── inbound newsletter ingest (the :ingest-email job) ────────────────────

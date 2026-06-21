@@ -31,9 +31,9 @@
   [tx from-email]
   (let [domain  (domain-of from-email)
         pattern (some->> domain (str "@"))]
-    (or (when pattern
-          (when-let [src (crud/find-1 tx :newsletter-sources {:inbound-email-alias pattern})]
-            (crud/by-id tx :affiliations (:newsletter-sources/affiliation-id src))))
+    (or (when-let [src (and pattern
+                            (crud/find-1 tx :newsletter-sources {:inbound-email-alias pattern}))]
+          (crud/by-id tx :affiliations (:newsletter-sources/affiliation-id src)))
         (let [nm  (if domain (sld-name domain) "Unknown newsletter")
               aff (crud/upsert! tx :affiliations
                                 {:name nm :slug (slug/slugify nm) :type "newsletter"}

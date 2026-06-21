@@ -117,6 +117,47 @@ button:active { transform: translateY(0.5px); }
 .chip--read { background: transparent; color: var(--muted); border: 1px solid var(--rule-2); }
 .chip--reading { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); }
 
+/* Tag chips read as content (sentence case, not the uppercase status pills) and
+   double as filter links: a clear pill affordance, no underline, accent fill when
+   active (= currently filtering). */
+.chip--tag {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-2);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.chip--tag:hover { color: var(--accent); border-color: var(--accent); }
+.chip--active, .chip--active:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { .chip--active, .chip--active:hover { color: #10201b; } }
+
+/* The tag filter bar above the reading list, and the per-row tag strip. */
+.tag-filter   { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: var(--s-4) 0; }
+.readable-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
+
+/* Reader-view tag editor: each tag is a chip with a quiet × remove, plus an
+   inline add field. */
+.reader-tags { margin: var(--s-6) 0; padding-top: var(--s-4); border-top: 1px solid var(--rule); }
+.reader-tag-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3);
+}
+.reader-tag { display: inline-flex; align-items: center; gap: var(--s-2); }
+.reader-tag form { display: inline; }
+.tag-remove {
+  border: none; background: none; cursor: pointer; padding: 0 0.1em;
+  color: var(--muted); font-size: 1.05rem; line-height: 1;
+}
+.tag-remove:hover { color: var(--gold); }
+.reader-tag-add form { display: flex; gap: var(--s-2); align-items: center; }
+.reader-tag-add input {
+  font-size: 0.875rem; padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--paper);
+}
+
 /* ---- Top bar / app shell ------------------------------------
    A sticky, translucent masthead with the wordmark and the primary
    nav. Shared across every signed-in page (reader.ui.layout/app-page). */

@@ -17,11 +17,26 @@
     (when (seq parts)
       (into [:div.readable-meta] parts))))
 
-(defn item [{:keys [queue-item-id title] :as readable}]
+(defn- tag-chip
+  "A tag rendered as a chip-link to its filtered list view; the active tag (the
+   one currently filtering) is marked so it reads as selected. `nav?` adds
+   aria-current on the active chip — set it for the filter bar (the one nav where
+   a tag is genuinely \"current\"), not the per-row strips where it would repeat."
+  ([active tag] (tag-chip active tag false))
+  ([active {:keys [slug label]} nav?]
+   (let [current? (= slug active)]
+     [:a (cond-> {:href  (str "/?tag=" slug)
+                  :class (str "chip chip--tag" (when current? " chip--active"))}
+           (and nav? current?) (assoc :aria-current "true"))
+      label])))
+
+(defn item [{:keys [queue-item-id title tags active-tag] :as readable}]
   [:li.readable {:id (str "q-" queue-item-id)}
    [:div.readable-text
     [:h2.readable-title [:a {:href (str "/queue/" queue-item-id)} title]]
-    (meta-line readable)]
+    (meta-line readable)
+    (when (seq tags)
+      (into [:div.readable-tags] (map #(tag-chip active-tag %) tags)))]
    [:form.readable-actions {:method "post"
                             :action (str "/queue/" queue-item-id "/archive")}
     (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-trash)]])
@@ -72,7 +87,22 @@
   (let [n (count readables)]
     (str n (if (= 1 n) " item" " items") " to work through")))
 
-(defn render [readables]
+(defn- filter-bar
+  "The tag filter row above the list: an \"All\" affordance plus a chip per tag in
+   the user's vocabulary. Hidden until there are any tags to filter by."
+  [all-tags active]
+  (when (seq all-tags)
+    (into [:nav.tag-filter {:aria-label "Filter reading list by tag"}
+           [:a (cond-> {:href "/" :class (str "chip chip--tag" (when (nil? active) " chip--active"))}
+                 (nil? active) (assoc :aria-current "true"))
+            "All"]]
+          (map #(tag-chip active % :nav) all-tags))))
+
+(defn render
+  "The reading list. `readables` are the (already tag-filtered) queue items,
+   `active` the slug currently filtering (or nil), `all-tags` the full vocabulary
+   for the filter bar."
+  [readables active all-tags]
   (layout/app-page
    "Reader" :queue
    (list
@@ -85,7 +115,11 @@
      [:input {:type "url" :name "url" :placeholder "Paste an article, paper, or newsletter URL…"
               :required true :autocomplete "off"}]
      (c/button {:type "submit" :variant :primary} "Add to queue")]
+    (filter-bar all-tags active)
     ;; Always render the list (even empty) so the HTMX afterbegin target exists.
-    [:ul.readables {:id "readables-list"} (map item readables)]
+    [:ul.readables {:id "readables-list"}
+     (map #(item (assoc % :active-tag active)) readables)]
     (when-not (seq readables)
-      [:p.muted "Nothing here yet — paste a URL above to add your first article."]))))
+      [:p.muted (if active
+                  "No items with this tag yet."
+                  "Nothing here yet — paste a URL above to add your first article.")]))))

@@ -73,10 +73,29 @@
        (action-form id "read"   "Mark as read"   :primary))
      (action-form id "archive" "Archive")]))
 
+(defn- tags-editor
+  "This item's effective tags — each a chip with a remove control — plus an
+   add-tag field. Owner-scoped writes post to /queue/:id/tags(/...)."
+  [queue-item-id tags]
+  [:section.reader-tags {:aria-label "Tags"}
+   (into [:ul.reader-tag-list]
+         (concat
+          (map (fn [{:keys [id label]}]
+                 [:li.reader-tag
+                  [:span.chip.chip--tag label]
+                  [:form {:method "post" :action (str "/queue/" queue-item-id "/tags/" id "/remove")}
+                   [:button.tag-remove {:type "submit" :aria-label (str "Remove tag: " label)} "×"]]])
+               tags)
+          [[:li.reader-tag-add
+            [:form {:method "post" :action (str "/queue/" queue-item-id "/tags")}
+             [:input {:type "text" :name "label" :placeholder "Add a tag…"
+                      :required true :autocomplete "off" :maxlength "60"}]
+             (components/button {:type "submit"} "Add")]]]))])
+
 (defn show
   "`queue-item` is the raw queue_items row (for state/controls); `content` is the
-   uniform map from `reader.extract`."
-  [queue-item content]
+   uniform map from `reader.extract`; `tags` is the item's effective tag set."
+  [queue-item content tags]
   (layout/app-page
    (:title content) nil
    (list
@@ -90,5 +109,6 @@
      (:body content)
      (links-line (:links content))
      (controls queue-item)
+     (tags-editor (:queue-items/id queue-item) tags)
      (when-let [unsub (unsubscribe-link content)]
        [:p.reader-unsubscribe unsub])])))

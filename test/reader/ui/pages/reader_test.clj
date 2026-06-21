@@ -14,7 +14,7 @@
                       :body    nil
                       :links   [{:label "Evil" :href "javascript:alert(1)"}
                                 {:label "Original" :href "https://example.test/x"}]}
-          html       (reader/show queue-item content)]
+          html       (reader/show queue-item content [])]
       (is (re-find #"https://example\.test/x" html) "the http(s) link renders")
       (is (not (re-find #"(?i)javascript:" html)) "the javascript: link is dropped")
       (is (re-find #"target=\"_blank\"" html) "external links open in a new tab")
@@ -22,7 +22,7 @@
 
 (deftest unsubscribe-link-rendering
   (let [reading {:queue-items/id (random-uuid) :queue-items/state "reading"}
-        render  (fn [unsub] (reader/show reading {:title "Issue" :unsubscribe-url unsub}))]
+        render  (fn [unsub] (reader/show reading {:title "Issue" :unsubscribe-url unsub} []))]
     (testing "an https unsubscribe url renders a hardened, new-tab Unsubscribe link"
       (let [html (render "https://news.test/unsub?u=1")]
         (is (re-find #"Unsubscribe" html))
@@ -50,6 +50,6 @@
                       :date    (Instant/parse "2024-01-15T10:30:00Z")
                       :body    nil
                       :links   nil}
-          html       (reader/show queue-item content)]
+          html       (reader/show queue-item content [])]
       (is (re-find #"2024-01-15" html) "the date renders as yyyy-MM-dd")
       (is (not (re-find #"10:30" html)) "the time portion is dropped"))))

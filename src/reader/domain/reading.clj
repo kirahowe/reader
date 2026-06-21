@@ -72,6 +72,12 @@
     (when (= user-id (:queue-items/user-id item))
       item)))
 
+(defn owned-item
+  "`user-id`'s raw queue item row by id, or nil when missing or another user's —
+   the owner-scoped fetch the tag-override handlers use to resolve the readable."
+  [ds user-id queue-item-id]
+  (owned ds user-id queue-item-id))
+
 (defn queue-item
   "The single normalized queue entry for `user-id`'s `queue-item-id`, read-only
    (no state change), or nil when missing, not theirs, or the readable is gone.

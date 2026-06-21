@@ -62,11 +62,29 @@
  :reader.handlers/inbound {:impl :webhook :hmac-secret #env/opt "INBOUND_HMAC_SECRET"}
  :reader.inbound/domain   #env/opt ["INBOUND_EMAIL_DOMAIN" "themiscellany.app"]
 
- ;; Background worker draining the ingest jobs (manual URL + inbound email).
+ ;; Tagging model clients. All #env/opt, so tagging boots before it's configured.
+ ;; Until the LLM + embedding Fly secrets are set, :require-model? makes the job
+ ;; record a :skipped event and reschedule itself rather than write stub tags
+ ;; into the shared baseline — so the corpus is tagged once the secrets land, not
+ ;; polluted before then. EMBED dimensions trimmed to 256 (Matryoshka) to keep
+ ;; embedding rows small. No vendor lock-in — point the URLs at any
+ ;; OpenAI-compatible endpoint.
+ :reader.ai/complete {:api-url #env/opt "LLM_API_URL"   :api-key #env/opt "LLM_API_KEY"
+                      :model   #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
+ :reader.ai/embed    {:api-url #env/opt "EMBED_API_URL" :api-key #env/opt "EMBED_API_KEY"
+                      :model   #env/opt ["EMBED_MODEL" "text-embedding-3-small"]
+                      :dimensions 256}
+ :reader.ingest.tag/tagger      {:model       #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
+ :reader.ingest.tag-job/handler {:embed-model     #env/opt ["EMBED_MODEL" "text-embedding-3-small"]
+                                 :require-model?  true
+                                 :skip-retry-secs 300}
+
+ ;; Background worker draining the ingest jobs (manual URL + inbound email + tagging).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
                       :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler
                                           "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler
-                                          "extract-paper"   #ig/ref :reader.papers/extract-paper-handler}
+                                          "extract-paper"   #ig/ref :reader.papers/extract-paper-handler
+                                          "tag-readable"    #ig/ref :reader.ingest.tag-job/handler}
                       :poll-ms           1000
                       :max-attempts      5
                       :backoff-base-secs 10}

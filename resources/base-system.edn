@@ -30,6 +30,8 @@
    ["/queue/:id/archive"   {:post {:handler #ig/ref :reader.handlers.queue/archive}}]
    ["/queue/:id/read"      {:post {:handler #ig/ref :reader.handlers.queue/mark-read}}]
    ["/queue/:id/unread"    {:post {:handler #ig/ref :reader.handlers.queue/mark-unread}}]
+   ["/queue/:id/tags"                {:post {:handler #ig/ref :reader.handlers.tags/add}}]
+   ["/queue/:id/tags/:tag-id/remove" {:post {:handler #ig/ref :reader.handlers.tags/remove}}]
    ["/settings"            {:get  {:handler #ig/ref :reader.handlers.settings/show}}]
    ["/settings/rotate"     {:post {:handler #ig/ref :reader.handlers.settings/rotate}}]
    ["/admin/extractions"   {:get  {:handler #ig/ref :reader.handlers.admin/extractions}}]
@@ -55,6 +57,8 @@
  :reader.handlers.queue/archive      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-read    {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.queue/mark-unread  {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.tags/add           {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.tags/remove        {:datasource #ig/ref :reader.db/migrator}
  ;; The host part of each user's newsletter alias — environment-specific; the
  ;; profiles override this placeholder. Shared by the settings show + rotate
  ;; handlers so both mint at the same domain.
@@ -93,6 +97,19 @@
  ;; :extract-paper job handler. Fetches the OpenAlex graph + arXiv HTML body over
  ;; the network (free APIs, no config) and upserts the canonical entity graph.
  :reader.papers/extract-paper-handler {}
+
+ ;; Auto-tagging. `tagger` is the swappable infer-tags abstraction (LLM-backed),
+ ;; and `embed` the embedder; both are pluggable reader.ai clients whose
+ ;; endpoints/creds come from the profiles, and both are nil until configured.
+ ;; The job gates on `tagger`/`embed`: with neither it runs the stubs (dev/test)
+ ;; or skips + reschedules (prod, via :require-model?), so stub data never lands
+ ;; in the shared baseline. The :tag-readable handler is registered with the
+ ;; worker in the dev/prod profiles.
+ :reader.ai/complete {}
+ :reader.ai/embed    {}
+ :reader.ingest.tag/tagger {:complete #ig/ref :reader.ai/complete}
+ :reader.ingest.tag-job/handler {:tagger #ig/ref :reader.ingest.tag/tagger
+                                 :embed  #ig/ref :reader.ai/embed}
 
  ;; Auth. jwks-url, issuer, api-url, allowed-emails, and the CSRF site-origin
  ;; are environment-specific and supplied by the dev/test/prod profiles.

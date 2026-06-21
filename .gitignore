@@ -12,3 +12,6 @@ target/
 .DS_Store
 node_modules/
 .wrangler/
+
+# Local planning scratch — not part of the published docs
+docs/plans/

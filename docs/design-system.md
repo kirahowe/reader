@@ -60,6 +60,12 @@ All return plain Hiccup from `reader.ui.components` (aliased `c`):
 | Icons | `c/icon-book`, `c/icon-trash`, `c/icon-chevron-left` | 24×24, `currentColor`, sized by CSS |
 | Byline | `(c/byline authors)` | comma-separated author links |
 
+**Tag chips.** Topical tags use the `chip--tag` variant — a lowercase *content*
+chip (not an uppercase status pill), rendered as a clickable filter link. They
+appear in the reading list's `.tag-filter` bar and under each item, and in the
+reader-view tag editor (each with a `×` remove control plus an "add a tag"
+field). The tag currently filtering gets `chip--active` (accent fill).
+
 ## Page anatomy
 
 A signed-in screen is wrapped by `layout/app-page`, which renders the

@@ -1,13 +1,16 @@
 # Reader
 
 A personal reading queue for articles, papers, and newsletter issues.
-Each user gets an inbound email alias for newsletters, can save URLs
-and upload PDFs, and works through a single ordered queue.
+Save a URL, paste an arXiv id or DOI, or forward a newsletter to your
+private inbound-email alias, and it lands in one ordered queue as a
+uniform "readable" you work through in a distraction-free reader view.
+New readables are auto-tagged, so the queue can be grouped and filtered
+by topic.
 
-The repo is currently at v0.1 — an end-to-end deployable scaffold
-(http-kit + Reitit, Integrant-managed lifecycle, vanilla CSS, CI to
-Fly.io) with the domain features still to come. See
-[`docs/roadmap.md`](docs/roadmap.md) for what's next.
+It's a multi-user, server-rendered Clojure app — http-kit + Reitit, an
+Integrant-managed lifecycle, Hanko auth, vanilla CSS — on Postgres
+(Neon) and Cloudflare R2, deployed to Fly.io with CI. See
+[`docs/roadmap.md`](docs/roadmap.md) for what's shipped and what's next.
 
 ## Stack
 
@@ -385,6 +388,62 @@ flyctl secrets set \
 To verify: grab your alias from `/settings`, email something to it, and watch
 it appear in your queue (`flyctl logs` shows the `:ingest-email` job running).
 
+### Auto-tagging
+
+On ingest, every readable is automatically tagged so the reading list can be
+grouped and filtered by topic. A `tag-readable` job (enqueued in the same
+transaction that finalizes the readable) asks a **large language model** for a
+few topical tags, **embeds** both the tag labels and the readable, and folds
+near-duplicate labels into the existing vocabulary by cosine similarity — so the
+tag set stays small instead of fragmenting. Tags surface as chips on the list
+(click one to filter); each item also has a per-user tag editor on its reader
+view. The decision record is [ADR 0005](docs/adr/0005-auto-tagging.md).
+
+Both the LLM and the embedder are **pluggable, OpenAI-compatible HTTP clients**
+(`reader.ai/complete` and `reader.ai/embed`) — point them at OpenAI, Groq, a
+local Ollama/llamafile, or anything that speaks `/chat/completions` and
+`/embeddings`. No vendor lock-in, no new dependencies. Embeddings are stored as
+plain `jsonb` arrays and compared in Clojure (no pgvector); they also seed the
+planned "more like this" feature.
+
+**In dev, tagging needs no setup.** With the model endpoints unset, the job runs
+a **stub tagger** (a couple of title-derived tags) and a deterministic stub
+embedder, so the whole pipeline — tag rows, dedup, the filter UI — works offline
+against the throwaway dev DB. To exercise a real model, set the endpoints in your
+shell before `bb dev` (a local Ollama needs no key):
+
+```sh
+# OpenAI
+export LLM_API_URL=https://api.openai.com/v1   LLM_API_KEY=sk-…   LLM_MODEL=gpt-4o-mini
+export EMBED_API_URL=https://api.openai.com/v1 EMBED_API_KEY=sk-… EMBED_MODEL=text-embedding-3-small
+# …or a local Ollama (no key)
+export LLM_API_URL=http://localhost:11434/v1   LLM_MODEL=llama3.2
+export EMBED_API_URL=http://localhost:11434/v1 EMBED_MODEL=nomic-embed-text
+```
+
+**In prod, tagging is gated on real credentials.** `:require-model?` is set, so
+until *both* the LLM and embedding endpoints are configured the job records a
+`:skipped` event and **reschedules itself** rather than writing stub tags into
+the shared corpus. The moment the secrets land, the backlog tags itself. All six
+values are `#env/opt`, so the app boots and deploys before they're set:
+
+```sh
+flyctl secrets set \
+  LLM_API_URL="https://api.openai.com/v1"   LLM_API_KEY="sk-…"   LLM_MODEL="gpt-4o-mini" \
+  EMBED_API_URL="https://api.openai.com/v1" EMBED_API_KEY="sk-…" EMBED_MODEL="text-embedding-3-small"
+```
+
+| Secret | What it is |
+| ------ | ---------- |
+| `LLM_API_URL` / `EMBED_API_URL` | Base URLs of OpenAI-compatible chat-completions / embeddings endpoints. **Both** must be set for tagging to run; either unset → the job skips and reschedules |
+| `LLM_API_KEY` / `EMBED_API_KEY` | Bearer tokens (omit for a local model with no auth) |
+| `LLM_MODEL` / `EMBED_MODEL`     | Model ids (default `gpt-4o-mini` / `text-embedding-3-small`) |
+
+A failed tag job retries with the same backoff as any job, and is fatal only
+when the readable is gone or the model breaks its output contract; a permanently
+failed readable simply stays untagged (you can still tag it by hand). Cost is
+usage-linear but tiny — fractions of a cent per readable on a cheap model.
+
 ### Configuration
 
 Configuration is EDN, not env vars. `base-system.edn` is always
@@ -400,14 +459,16 @@ env/prod/resources/prod.edn        # in the image at /app/conf, on the classpath
 
 The few values that must come from the environment — the HTTP `PORT`,
 the database connection string and auth config (`DATABASE_URL`,
-`SITE_ORIGIN`, `HANKO_API_URL`, `ALLOWED_EMAILS`), and the inbound-email
+`SITE_ORIGIN`, `HANKO_API_URL`, `ALLOWED_EMAILS`), the inbound-email
 config (`INBOUND_HMAC_SECRET`, `INBOUND_EMAIL_DOMAIN`, `R2_ACCOUNT_ID`,
-`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) — are pulled in
+`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`), and the
+auto-tagging model config (`LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`,
+`EMBED_API_URL`, `EMBED_API_KEY`, `EMBED_MODEL`) — are pulled in
 inline via reader literals like `#env/long ["PORT" 8080]` and
 `#env "DATABASE_URL"`. See [One-time production
-setup](#one-time-production-setup) and [Inbound
-email](#inbound-email-newsletters) for how those are supplied as Fly
-secrets and a CI deploy token.
+setup](#one-time-production-setup), [Inbound
+email](#inbound-email-newsletters), and [Auto-tagging](#auto-tagging)
+for how those are supplied as Fly secrets and a CI deploy token.
 
 ### Multiple environments
 

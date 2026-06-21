@@ -40,6 +40,7 @@ flowchart TB
     subgraph features["ingestion features"]
       ingest["reader.ingest<br/><i>URL + email</i>"]
       papers["reader.papers<br/><i>arXiv / OpenAlex</i>"]
+      tagf["reader.ingest.tag<br/><i>auto-tag + embed</i>"]
     end
 
     worker2["reader.jobs/worker<br/><i>single thread, drains jobs table</i>"]
@@ -58,6 +59,8 @@ flowchart TB
 
   ig{{"Integrant system<br/><i>owns every lifecycle</i>"}}
 
+  modelapi[("Model API<br/><i>LLM + embeddings<br/>OpenAI-compatible</i>")]
+
   browser <-->|HTTPS<br/>HTML over HTMX| httpkit
   emailrt --> worker
   worker -->|put raw .eml| r2
@@ -66,6 +69,7 @@ flowchart TB
   domain -->|next.jdbc + HoneySQL| neon
   worker2 -->|next.jdbc| neon
   worker2 -->|S3 SDK: GET .eml| r2
+  tagf -->|POST /chat,/embeddings| modelapi
   mw <-->|verify JWT via JWKS| hk
   authh <-->|login element| hk
 
@@ -78,7 +82,7 @@ flowchart TB
 
   classDef ext fill:#f4f1ec,stroke:#999,color:#333
   classDef ig fill:#e8f0eb,stroke:#2b4a3f,color:#1a1a1a
-  class cloudflare,hanko ext
+  class cloudflare,hanko,modelapi ext
   class ig ig
 ```
 
@@ -109,9 +113,10 @@ public API and its `foo/` directory holds the internals — `ingest`, `papers`,
 | `reader.web.*`           | Request/response helpers, the middleware components, CSRF, HMAC  |
 | `reader.handlers.*`      | HTTP glue — one ns per resource, parses request → calls domain   |
 | `reader.ui.*`            | Hiccup components + per-page renderers                           |
-| `reader.domain.*`        | Per-entity domain logic (articles, authors, affiliations, authorships, newsletters, users, inboxes, readables, reading) |
-| `reader.ingest` (+`.*`)  | Manual-URL + newsletter ingestion pipeline                       |
+| `reader.domain.*`        | Per-entity domain logic (articles, authors, affiliations, authorships, newsletters, users, inboxes, readables, reading, tags) |
+| `reader.ingest` (+`.*`)  | Manual-URL + newsletter ingestion; the `tag-readable` auto-tagging job (`.tag` abstraction, `.tag-job` orchestrator) |
 | `reader.papers` (+`.*`)  | arXiv/DOI paper ingestion (OpenAlex graph + arXiv HTML)          |
+| `reader.ai`              | Pluggable OpenAI-compatible model clients — completion + embeddings |
 | `reader.jobs` (+`.worker`) | Durable job queue table + the polling worker                   |
 | `reader.db.*`            | HikariCP datasource, Migratus migrator, CRUD + JDBC type glue    |
 | `reader.storage.*`       | The `Blobs` blob-storage abstraction (memory / file / R2)        |
@@ -150,6 +155,9 @@ consumers — none are looked up globally at use-time. The wiring lives in
 | `:reader.ingest/extract-article-handler`  | The `:extract-article` job — fetch + extract a pasted URL         |
 | `:reader.ingest/ingest-email-handler`     | The `:ingest-email` job — parse the `.eml`, file the issue        |
 | `:reader.papers/extract-paper-handler`    | The `:extract-paper` job — fetch the OpenAlex graph + arXiv body  |
+| `:reader.ai/complete` · `:reader.ai/embed` | Pluggable model clients (chat-completion + embeddings); nil until configured |
+| `:reader.ingest.tag/tagger`               | Swappable infer-tags abstraction (LLM-backed; nil when no model configured) |
+| `:reader.ingest.tag-job/handler`          | The `:tag-readable` job — infer tags, embed + dedup, write the baseline |
 
 `concerns/` is library-specific glue; `handlers/` is app code. Routes data lives
 in EDN — each leaf is an `#ig/ref` to a handler key, so adding a route is a
@@ -167,8 +175,29 @@ recovered by the next lease; failures retry with exponential backoff up to
 `max-attempts` (5), then land in `failed`. A handler can flag a permanent
 failure (`ex-data :fatal?`) to skip retries.
 
-Three queues today: `extract-article` (pasted URLs), `ingest-email`
-(forwarded newsletters), and `extract-paper` (arXiv/DOI papers).
+Four queues today: `extract-article` (pasted URLs), `ingest-email`
+(forwarded newsletters), `extract-paper` (arXiv/DOI papers), and
+`tag-readable` (auto-tagging — enqueued by the other three when they finalize a
+readable).
+
+## Auto-tagging
+
+When a readable is finalized, its ingest path enqueues a `tag-readable` job in
+the same transaction. The job (`reader.ingest.tag-job`) loads the readable's
+text, asks the **infer-tags abstraction** (`reader.ingest.tag` — LLM-backed via
+`reader.ai/complete`, behind a Malli `TagResult` contract that caps and
+validates untrusted output) for a few topical tags, **embeds** the labels and
+the readable via `reader.ai/embed`, and folds near-duplicate labels into the
+existing vocabulary by cosine similarity (≥ 0.90) before writing the shared
+`readable_tags` baseline, the `readable_embeddings` row, and a `tagging_events`
+eval row — all in one transaction. Tags are intrinsic to the content (shared
+across users); a per-user `queue_item_tags` delta layers add/suppress overrides
+on top. The model clients are pluggable OpenAI-compatible HTTP calls — no vendor
+lock-in, no new deps — and embeddings are `jsonb` arrays compared in Clojure (no
+pgvector). When no real model is configured the job runs deterministic stubs
+(dev/test) or, with `:require-model?` set (prod), records a `:skipped` event and
+reschedules itself so stub data never lands in the shared corpus. See
+[ADR 0005](adr/0005-auto-tagging.md).
 
 ## Request lifecycle: typical page render
 

@@ -228,6 +228,87 @@ Durable background work.
 
 Workers do `SELECT ... FOR UPDATE SKIP LOCKED` to claim a job.
 
+### Auto-tagging: `tags`, `readable_tags`, `queue_item_tags`, `readable_embeddings`
+
+Topical tags inferred on ingest (see [the auto-tagging
+section](architecture.md#auto-tagging)). `tags` is the shared vocabulary;
+`readable_tags` is the intrinsic baseline (per readable, shared across users);
+`queue_item_tags` is a per-user override delta on top.
+
+#### `tags`
+The shared tag vocabulary.
+
+| column      | type        | notes                                                              |
+| ----------- | ----------- | ------------------------------------------------------------------ |
+| `id`        | uuid PK     |                                                                    |
+| `slug`      | text UK     | normalized identity (lowercased, hyphenated)                       |
+| `label`     | text        | display label (lowercased, ≤ 60 chars)                             |
+| `embedding` | jsonb NULL  | the label's embedding (JSON array of floats), for near-dup folding |
+| `created_at`| timestamptz |                                                                    |
+
+#### `readable_tags`
+The shared baseline: which tags the model assigned to a readable. Polymorphic on
+the readable side (`readable_type` + `readable_id`), like `authorships`.
+
+| column          | type        | notes                                                |
+| --------------- | ----------- | ---------------------------------------------------- |
+| `id`            | uuid PK     |                                                      |
+| `tag_id`        | uuid FK     | → `tags.id` (cascade)                                |
+| `readable_type` | text        | `article` / `paper` / `newsletter_issue`             |
+| `readable_id`   | uuid        | application-enforced (polymorphic)                   |
+| `source`        | text        | `llm` / `manual`                                     |
+| `confidence`    | double      | the model's reported confidence (0–1)                |
+| `created_at`    | timestamptz |                                                      |
+
+Unique `(tag_id, readable_type, readable_id)`.
+
+#### `queue_item_tags`
+A per-user override: a sparse delta on the baseline, scoped to one queue item.
+
+| column          | type        | notes                                                        |
+| --------------- | ----------- | ------------------------------------------------------------ |
+| `id`            | uuid PK     |                                                              |
+| `queue_item_id` | uuid FK     | → `queue_items.id` (cascade)                                 |
+| `tag_id`        | uuid FK     | → `tags.id` (cascade)                                        |
+| `op`            | text        | `add` (pin a tag not in the baseline) / `suppress` (hide one)|
+| `created_at`    | timestamptz |                                                              |
+
+Unique `(queue_item_id, tag_id)`. A user's **effective** tags for an item are
+`baseline ∖ suppressions ∪ additions`.
+
+#### `readable_embeddings`
+One embedding per readable, for "more like this" / recommendations (phase 2).
+Populated now so the corpus needn't be reprocessed later.
+
+| column          | type        | notes                                          |
+| --------------- | ----------- | ---------------------------------------------- |
+| `id`            | uuid PK     |                                                |
+| `readable_type` | text        | polymorphic                                    |
+| `readable_id`   | uuid        | application-enforced                           |
+| `embedding`     | jsonb       | the readable's embedding (JSON array of floats)|
+| `model`         | text NULL   | which embedding model produced it              |
+| `created_at`    | timestamptz |                                                |
+
+Unique `(readable_type, readable_id)`.
+
+### `tagging_events`
+Observability for the tag-readable job, shaped like `extraction_events` (not a
+domain table): one row per attempt, with first-class metric columns plus a jsonb
+`provenance` bag (proposed labels + vocab size) for offline evals.
+
+| column          | type        | notes                            |
+| --------------- | ----------- | -------------------------------- |
+| `id`            | uuid PK     |                                  |
+| `readable_type` | text        |                                  |
+| `readable_id`   | uuid        |                                  |
+| `outcome`       | text        | `done` / `failed` / `skipped`    |
+| `error_class`   | text NULL   |                                  |
+| `model`         | text NULL   |                                  |
+| `tag_count`     | int NULL    |                                  |
+| `duration_ms`   | int NULL    |                                  |
+| `provenance`    | jsonb       | proposed labels + vocab size     |
+| `created_at`    | timestamptz |                                  |
+
 ## ER diagram
 
 ```mermaid
@@ -335,6 +416,35 @@ erDiagram
     timestamptz locked_until
   }
 
+  tags {
+    uuid id PK
+    text slug UK
+    text label
+    jsonb embedding
+  }
+
+  readable_tags {
+    uuid id PK
+    uuid tag_id FK
+    text readable_type "article|paper|newsletter_issue"
+    uuid readable_id
+    double confidence
+  }
+
+  queue_item_tags {
+    uuid id PK
+    uuid queue_item_id FK
+    uuid tag_id FK
+    text op "add|suppress"
+  }
+
+  readable_embeddings {
+    uuid id PK
+    text readable_type
+    uuid readable_id
+    jsonb embedding
+  }
+
   authors ||--o{ author_affiliations : "writes for"
   affiliations ||--o{ author_affiliations : "has"
   affiliations ||--o| newsletter_sources : "may be a newsletter"
@@ -350,6 +460,9 @@ erDiagram
   articles ||--o{ queue_items : "polymorphic"
   papers ||--o{ queue_items : "polymorphic"
   newsletter_issues ||--o{ queue_items : "polymorphic"
+  tags ||--o{ readable_tags : "applied to readables"
+  tags ||--o{ queue_item_tags : "per-user override"
+  queue_items ||--o{ queue_item_tags : "overrides"
 ```
 
 ## Modeling notes
@@ -405,6 +518,26 @@ one found via some other blog looks like:
 If a `via.source` value ever needs to be filtered on aggressively,
 that's a sign to pull it out into a real column.
 
+### Tags: shared baseline + per-user override
+
+A tag describes the *content*, so the model-inferred baseline lives on the
+readable (`readable_tags`), shared across every user who has it queued —
+computed once. A user's own edits are a sparse delta on their queue item
+(`queue_item_tags`): an `add` pins a tag the baseline lacks, a `suppress` hides
+one it has. Effective tags resolve to `baseline ∖ suppressions ∪ additions`, so
+re-tagging a readable (a better model, a re-ingest) propagates to everyone
+automatically while each user's customizations stand.
+
+### Embeddings as jsonb, not pgvector
+
+Tag-label and readable embeddings are stored as `jsonb` arrays of floats and
+compared with cosine similarity in Clojure, not in pgvector. The embedded
+Postgres used in dev/test has no vector extension, so jsonb keeps dev, test, and
+prod identical; and at this scale (a personal library) brute-force cosine is
+sub-100ms — a vector index is unnecessary until tens of thousands of vectors.
+The `tags.slug` identity is the stable hook to add a `vector` column later if
+that day comes.
+
 ### Indexes (planned for v1)
 - `authors(slug)` unique
 - `affiliations(slug)` unique
@@ -416,3 +549,8 @@ that's a sign to pull it out into a real column.
 - `authorships(author_id)` for "what has X written"
 - `queue_items(user_id, state, added_at desc)` for the queue view
 - `jobs(state, run_at)` where `state = 'pending'` for the worker poll
+- `tags(slug)` unique
+- `readable_tags(readable_type, readable_id)` and `(tag_id)`
+- `queue_item_tags(queue_item_id)`
+- `readable_embeddings(readable_type, readable_id)` unique
+- `tagging_events(readable_type, readable_id)` and `(created_at desc)`

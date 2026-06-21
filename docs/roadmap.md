@@ -285,16 +285,55 @@ The boring-but-important stuff before this is the daily-driver.
 
 ---
 
+## Step 10 — Auto-tagging ✅
+
+Every readable is automatically tagged on ingest, so the reading list can be
+grouped and filtered by topic — and the groundwork for internal recommendations.
+
+**Delivered**
+- `reader.ai` — pluggable, OpenAI-compatible model clients (`complete` +
+  `embed`) over `reader.http/post!`, no new deps; swap OpenAI for a local Ollama
+  by config alone, no vendor lock-in.
+- `reader.ingest.tag` — the swappable `infer-tags` abstraction (LLM-backed,
+  behind a Malli `TagResult` contract that caps/validates untrusted output),
+  mirroring the `entity-extractor` pattern.
+- `reader.ingest.tag-job` — the `:tag-readable` job, enqueued in `finalize!` /
+  `record-issue!`: infer tags, embed labels + readable, fold near-duplicate
+  labels into the vocabulary by cosine similarity (≥ 0.90), then write the shared
+  `readable_tags` baseline + `readable_embeddings` + a `tagging_events` row.
+- `reader.domain.tags` — the vocabulary, cosine dedup, effective-tag resolution
+  (shared baseline minus per-user suppressions plus additions), and overrides.
+- Reading-list tag chips + filter bar, and a per-item tag editor on the reader
+  view (`reader.handlers.tags`, owner-scoped).
+- Migration `20260620120000-tags`: `tags`, `readable_tags`, `queue_item_tags`,
+  `readable_embeddings`, `tagging_events`. Embeddings are `jsonb`, cosine in
+  Clojure — no pgvector (see [data-model.md](./data-model.md)).
+- Stubbed in dev so the pipeline runs offline; in prod `:require-model?` makes
+  the job skip + reschedule until the LLM/embedding secrets land, so stub data
+  never pollutes the shared corpus.
+
+**Done.** Full suite green; tagging works end-to-end in dev with stubs and with a
+real model when the endpoints are set. See [ADR
+0005](./adr/0005-auto-tagging.md) and [README →
+Auto-tagging](../README.md#auto-tagging).
+
+**Next (phase 2):** "more like this" / recommendations from the stored
+`readable_embeddings`, and an `/admin/tagging` eval dashboard mirroring
+`/admin/extractions`.
+
+---
+
 ## Beyond v1
 
 These are deliberately out of scope for v1 but worth naming so they
 don't accidentally creep in:
 
-- **Tags.** Probably yes eventually; not in v1.
+- **Tags.** ✅ Shipped — see [Step 10](#step-10--auto-tagging-).
+- **Recommendations.** Content-based "more like this" over the readable
+  embeddings stored by Step 10 — the natural phase-2 of auto-tagging. (Author
+  suggestions might one day justify pulling the graph into a graph store.)
 - **Multi-user public deployment.** The schema is multi-tenant-ready,
   but the auth flow and rate-limiting story aren't designed for it.
 - **Search.** Postgres FTS is a small step; not yet.
-- **Recommendations / author suggestions.** This is the use case that
-  might one day justify pulling the graph into a graph store.
 - **Mobile app.** The web app is mobile-friendly; a native app is a
   later question.

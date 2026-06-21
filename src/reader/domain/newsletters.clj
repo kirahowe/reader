@@ -6,6 +6,7 @@
   (:require [clojure.string :as str]
             [reader.domain.authors :as authors]
             [reader.db.crud :as crud]
+            [reader.jobs :as jobs]
             [reader.domain.reading :as reading]
             [reader.util.slug :as slug])
   (:import (java.time Instant)))
@@ -73,6 +74,8 @@
                                              :readable-type "newsletter_issue"
                                              :readable-id   (:newsletter-issues/id iss)
                                              :ordinal       0})
+              (jobs/enqueue! tx "tag-readable"
+                             {:readable-type "newsletter_issue" :readable-id (:newsletter-issues/id iss)})
               iss))]
     (reading/enqueue-if-absent! tx user-id "newsletter_issue" (:newsletter-issues/id issue)
                                 {:source "email" :from from-email})))

@@ -51,6 +51,7 @@
                                        :readable-type "article"
                                        :readable-id   article-id
                                        :ordinal       i})))
+    (jobs/enqueue! tx "tag-readable" {:readable-type "article" :readable-id article-id})
     (crud/by-id tx :articles article-id)))
 
 (defn persist!

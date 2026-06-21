@@ -117,6 +117,7 @@
           (let [fid (:affiliations/id (affiliations/resolve! tx (assoc (select-keys inst [:name :ror :openalex-id])
                                                                        :type "institution")))]
             (link-author-affiliation! tx aid fid)))))
+    (jobs/enqueue! tx "tag-readable" {:readable-type "paper" :readable-id paper-id})
     (crud/by-id tx :papers paper-id)))
 
 (defn- ref-url

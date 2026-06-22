@@ -99,24 +99,66 @@
     (when (and a b (< a b)) (subs s a (inc b)))))
 
 (defn parse
-  "Parse a model response into a raw seq of {:label :confidence} proposals.
-   Tolerant of fences/prose; returns [] when nothing parseable is found."
+  "Parse a model response into a vector of {:label :confidence} proposals, or nil
+   when the response holds no parseable tag object at all — a model failure the
+   caller can retry, kept distinct from a parsed-but-empty `[]` (the model saw
+   nothing to tag). Tolerant of fences/prose around the JSON."
   [text]
-  (if-let [obj (json-object text)]
-    (->> (:tags (read-json obj))
-         (map (fn [t] {:label (:label t) :confidence (:confidence t)}))
-         vec)
-    []))
+  (when-let [obj (json-object text)]
+    (try
+      (let [parsed (read-json obj)]
+        (when (contains? parsed :tags)
+          (mapv (fn [t] {:label (:label t) :confidence (:confidence t)}) (:tags parsed))))
+      (catch Exception _ nil))))
+
+;; ── structured-output schema ─────────────────────────────────────────────
+
+(def ^:private tags-response-schema
+  "JSON Schema (OpenAI Structured Outputs) pinning the model to the tag shape.
+   Deliberately types-only: the count/length/range *caps* stay in `coerce`, since
+   strict mode doesn't reliably enforce min/max and the Malli boundary must hold
+   regardless of which provider/mode produced the output. Strict mode also
+   requires every property listed in `required` and `additionalProperties false`."
+  {:type "object"
+   :additionalProperties false
+   :required ["tags"]
+   :properties
+   {:tags {:type "array"
+           :items {:type "object"
+                   :additionalProperties false
+                   :required ["label" "confidence"]
+                   :properties {:label      {:type "string"}
+                                :confidence {:type "number"}}}}}})
+
+(defn- response-opts
+  "Completion opts for a response-format `mode` (the provider-capability knob):
+   :json-schema → strict Structured Outputs against `tags-response-schema`;
+   :json-object → JSON mode (valid JSON, shape unpinned); nil/:none → unset."
+  [mode]
+  (case mode
+    :json-schema {:response-format {:mode   :json-schema
+                                    :name   "tags"
+                                    :schema tags-response-schema}}
+    :json-object {:response-format :json-object}
+    nil))
 
 ;; ── default implementation + stub ────────────────────────────────────────
 
 (defn llm-tagger
   "The default infer-tags implementation: (fn [content existing-labels] -> TagResult)
-   over a completion fn (reader.ai/complete). `model` is recorded for evals."
-  [complete-fn model]
-  (fn [content existing-labels]
-    {:tags  (parse (complete-fn (build-messages content existing-labels)))
-     :model model}))
+   over a completion fn (reader.ai/complete). `model` is recorded for evals;
+   `response-format` is the provider-capability mode (see `response-opts`). An
+   unparseable response throws a retryable `:unparseable-tags` error rather than
+   masquerading as zero tags — a model hiccup should retry, not record success."
+  ([complete-fn model] (llm-tagger complete-fn model nil))
+  ([complete-fn model response-format]
+   (let [opts (response-opts response-format)]
+     (fn [content existing-labels]
+       (let [proposals (parse (complete-fn (build-messages content existing-labels) opts))]
+         (when (nil? proposals)
+           (throw (ex-info "model returned no parseable tag JSON"
+                           {:error-class :unparseable-tags})))
+         {:tags proposals :model model})))))
 
 (def ^:private stopwords
   #{"the" "a" "an" "and" "or" "of" "to" "in" "on" "for" "with" "how" "why"
@@ -145,5 +187,6 @@
   ;; none is configured — the tag-job then runs the stub (dev/test) or skips
   ;; (prod), so the stub-vs-skip policy lives in one place alongside the embedder.
   ;; Swap the LLM for a local model by pointing `complete` at a different provider.
-  [_ {:keys [complete model]}]
-  (when complete (llm-tagger complete (or model "unknown"))))
+  ;; `response-format` is the provider-capability mode (see `response-opts`).
+  [_ {:keys [complete model response-format]}]
+  (when complete (llm-tagger complete (or model "unknown") response-format)))

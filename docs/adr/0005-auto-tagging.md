@@ -42,9 +42,10 @@ them in Clojure.**
 (one-shot chat-completion inference) and `:reader.ai/embed` — built on
 `reader.http/post!` (http-kit + charred). **No new dependencies.** Both speak the
 OpenAI-compatible wire shape (`/chat/completions`, `/embeddings`), the lowest
-common denominator that OpenAI, Groq, and a local Ollama/llamafile all serve, so
-the provider is a config swap, not a code change — **no vendor lock-in**. Each is
-`nil` until its endpoint is configured.
+common denominator that OpenRouter (the default), OpenAI, Groq, and a local
+Ollama/llamafile all serve, so the provider is a config swap, not a code change —
+**no vendor lock-in**. Each is `nil` until its api-key is set (the URL defaults to
+OpenRouter), so the credential is the single switch that turns tagging on.
 
 We start with a cheap cloud model. Its cost is usage-linear but negligible at
 personal scale (fractions of a cent per readable); the eval table (below) is the
@@ -58,6 +59,30 @@ Malli `TagResult` contract whose caps (≤ 12 tags, ≤ 60-char labels) are the
 guardrail on untrusted model output, enforced by `coerce`/`valid?` regardless of
 implementation. The default is LLM-backed; a local-model implementation behind
 the same contract is a wiring change.
+
+### Reliable model output: structured outputs + defense-in-depth
+
+An LLM in the loop returns text; we need a known shape. Three layers, strongest
+first:
+
+1. **Structured Outputs.** The completion carries a `response_format` — strict
+   `json_schema` by default (the `gpt-4o-mini` default supports it), so the model
+   is constrained to emit the tag shape rather than asked nicely to. The mode is a
+   config knob (`:reader.ingest.tag/tagger :response-format`), since strict schema
+   support isn't universal across OpenAI-compatible endpoints — drop to
+   `:json-object` or `:none` for one that lacks it.
+2. **The Malli boundary still validates** regardless of which mode (or provider)
+   produced the output — `coerce`/`valid?` clamp caps and normalize labels. The
+   schema is *types-only* precisely so the caps live in one enforced place; strict
+   mode doesn't reliably enforce min/max anyway.
+3. **A tolerant parser** salvages JSON from prose/fences for `:none`/`:json-object`
+   providers. A response with *no* parseable tag object is a retryable
+   `:unparseable-tags` failure — distinct from a parsed-but-empty result — so a
+   model hiccup retries through the job queue rather than silently recording zero
+   tags as success.
+
+`temperature 0` keeps classification deterministic; `:max-tokens` caps a runaway
+generation.
 
 ### Embedding-based dedup; no pgvector
 

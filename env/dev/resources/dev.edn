@@ -32,17 +32,25 @@
  ;; file store in dev — a REPL can seed it to exercise the path locally).
  :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
 
- ;; Tagging model clients. Unset by default → the title-derived stub tagger and
- ;; the deterministic stub embedder, so dev runs the tag pipeline with no keys.
- ;; Set LLM_API_URL / LLM_API_KEY (+ EMBED_* / a local Ollama endpoint) to
- ;; exercise a real model.
- :reader.ai/complete {:api-url #env/opt "LLM_API_URL"   :api-key #env/opt "LLM_API_KEY"
-                      :model   #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
- :reader.ai/embed    {:api-url #env/opt "EMBED_API_URL" :api-key #env/opt "EMBED_API_KEY"
-                      :model   #env/opt ["EMBED_MODEL" "text-embedding-3-small"]
+ ;; Tagging model clients. Default to OpenRouter, but stay stubbed until a key is
+ ;; set: no LLM_API_KEY → the title-derived stub tagger and deterministic stub
+ ;; embedder, so dev runs the tag pipeline with no account. Set LLM_API_KEY (and
+ ;; EMBED_API_KEY) to exercise a real model; override LLM_MODEL / *_API_URL for a
+ ;; different model or a local endpoint.
+ :reader.ai/complete {:api-url #env/opt ["LLM_API_URL" "https://openrouter.ai/api/v1"]
+                      :api-key #env/opt "LLM_API_KEY"
+                      :model   #env/opt ["LLM_MODEL" "openai/gpt-4o-mini"]
+                      :max-tokens 512}
+ :reader.ai/embed    {:api-url #env/opt ["EMBED_API_URL" "https://openrouter.ai/api/v1"]
+                      :api-key #env/opt "EMBED_API_KEY"
+                      :model   #env/opt ["EMBED_MODEL" "openai/text-embedding-3-small"]
                       :dimensions 256}
- :reader.ingest.tag/tagger      {:model       #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
- :reader.ingest.tag-job/handler {:embed-model #env/opt ["EMBED_MODEL" "text-embedding-3-small"]}
+ ;; :response-format pins the tagger's output shape. :json-schema (strict
+ ;; Structured Outputs) suits the default model; switch to :json-object or :none
+ ;; for an endpoint that doesn't support it.
+ :reader.ingest.tag/tagger      {:model       #env/opt ["LLM_MODEL" "openai/gpt-4o-mini"]
+                                 :response-format :json-schema}
+ :reader.ingest.tag-job/handler {:embed-model #env/opt ["EMBED_MODEL" "openai/text-embedding-3-small"]}
 
  ;; Background worker draining the ingest jobs (manual URL + inbound email + tagging).
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator

@@ -62,20 +62,28 @@
  :reader.handlers/inbound {:impl :webhook :hmac-secret #env/opt "INBOUND_HMAC_SECRET"}
  :reader.inbound/domain   #env/opt ["INBOUND_EMAIL_DOMAIN" "themiscellany.app"]
 
- ;; Tagging model clients. All #env/opt, so tagging boots before it's configured.
- ;; Until the LLM + embedding Fly secrets are set, :require-model? makes the job
- ;; record a :skipped event and reschedule itself rather than write stub tags
- ;; into the shared baseline — so the corpus is tagged once the secrets land, not
- ;; polluted before then. EMBED dimensions trimmed to 256 (Matryoshka) to keep
- ;; embedding rows small. No vendor lock-in — point the URLs at any
- ;; OpenAI-compatible endpoint.
- :reader.ai/complete {:api-url #env/opt "LLM_API_URL"   :api-key #env/opt "LLM_API_KEY"
-                      :model   #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
- :reader.ai/embed    {:api-url #env/opt "EMBED_API_URL" :api-key #env/opt "EMBED_API_KEY"
-                      :model   #env/opt ["EMBED_MODEL" "text-embedding-3-small"]
+ ;; Tagging model clients — default to OpenRouter; set the LLM_API_KEY /
+ ;; EMBED_API_KEY Fly secrets to activate. Until those keys are set the clients
+ ;; stay nil, so :require-model? makes the job record a :skipped event and
+ ;; reschedule itself rather than write stub tags into the shared baseline — the
+ ;; corpus is tagged once the secrets land, not polluted before then. EMBED
+ ;; dimensions trimmed to 256 (Matryoshka) to keep embedding rows small. No vendor
+ ;; lock-in — override *_API_URL / *_MODEL for any OpenAI-compatible endpoint.
+ :reader.ai/complete {:api-url #env/opt ["LLM_API_URL" "https://openrouter.ai/api/v1"]
+                      :api-key #env/opt "LLM_API_KEY"
+                      :model   #env/opt ["LLM_MODEL" "openai/gpt-4o-mini"]
+                      :max-tokens 512}
+ :reader.ai/embed    {:api-url #env/opt ["EMBED_API_URL" "https://openrouter.ai/api/v1"]
+                      :api-key #env/opt "EMBED_API_KEY"
+                      :model   #env/opt ["EMBED_MODEL" "openai/text-embedding-3-small"]
                       :dimensions 256}
- :reader.ingest.tag/tagger      {:model       #env/opt ["LLM_MODEL" "gpt-4o-mini"]}
- :reader.ingest.tag-job/handler {:embed-model     #env/opt ["EMBED_MODEL" "text-embedding-3-small"]
+ ;; :response-format pins the tagger's output shape to strict Structured Outputs
+ ;; (the default model supports it); switch to :json-object or :none for an
+ ;; endpoint that doesn't. The Malli boundary in reader.ingest.tag still validates
+ ;; regardless, so this is reliability, not the only line of defense.
+ :reader.ingest.tag/tagger      {:model       #env/opt ["LLM_MODEL" "openai/gpt-4o-mini"]
+                                 :response-format :json-schema}
+ :reader.ingest.tag-job/handler {:embed-model     #env/opt ["EMBED_MODEL" "openai/text-embedding-3-small"]
                                  :require-model?  true
                                  :skip-retry-secs 300}
 

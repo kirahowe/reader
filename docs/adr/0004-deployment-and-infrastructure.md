@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-05-17
+- **Amended**: 2026-06-21 (cold-start tuning)
 
 ## Context
 
@@ -47,6 +48,46 @@ A single Fly machine in `yyz`, scaling to zero when idle and back up
 on first request. Fly's auto-stop economics fit the same usage shape
 as Neon. Deploys are `flyctl deploy --remote-only`, run from CI on
 green merges to `main` or by a human via `bb deploy`.
+
+### Cold-start tuning (amended 2026-06-21)
+
+Scaling to zero puts the JVM cold boot on the request path: the first
+request after idle has to start the machine *and* boot the app before
+the HTTP server binds `8080`. Fly's proxy retries that connect for only
+~8s before returning `[PM05]`, and that window is not configurable — so
+a boot slower than the window drops the request. The choice is to keep
+scale-to-zero (it's the whole cost shape, shared with Neon) and shrink
+boot to fit the window, rather than keep a machine warm.
+
+Three levers, all preserving `min_machines_running = 0`:
+
+- **AOT-compile every namespace** (`build.clj`). The system is wired in
+  EDN and its namespaces are pulled in at runtime by
+  `ig/load-namespaces`, so they were invisible to a `reader.main`-rooted
+  compile graph and were compiled *from source on every cold boot*.
+  Compiling all of `src` moves that cost to build time — namespace
+  loading dropped from ~2.2s to ~0.6s in local measurement.
+- **JVM fast-start flags** (`Dockerfile` ENTRYPOINT): `-XX:+UseSerialGC`
+  (no concurrent GC threads contending with the app on a single shared
+  vCPU) and `-XX:TieredStopAtLevel=1` (skip the C2 JIT). Both trade peak
+  throughput for startup speed — the right trade for a low-traffic
+  machine that lives a few minutes.
+- **1gb VM memory** for Clojure's metaspace + code cache. Still a flat
+  cost.
+
+**Rejected (kept as a fallback): a warm machine** (`min_machines_running
+= 1`). It's the only *hard* guarantee against a cold-start miss, but the
+worker polls the jobs table ~1/s, so an always-running machine keeps
+Neon awake continuously — undoing the scale-to-zero cost shape on both
+sides. It becomes attractive only paired with worker poll-backoff (so an
+idle machine stops querying Neon), which is separate planned work.
+
+**If the boot speedups prove insufficient**, the next scale-to-zero-safe
+levers are an AppCDS archive baked at build time (cut classloading via a
+training run that loads namespaces without `ig/init`), Clojure direct
+linking at AOT (fewer var indirections — but it forecloses runtime var
+redefinition, so verify nothing in the prod path relies on it), and, as
+the heavy option, CRaC (checkpoint a warmed JVM, restore in ms).
 
 ### Cloudflare R2 + Email Routing Worker
 

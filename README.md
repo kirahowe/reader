@@ -216,9 +216,9 @@ storage. The unit of deployment is a container image built from the
 multi-stage [`Dockerfile`](Dockerfile), which produces an
 `eclipse-temurin:25-jre` image with the uberjar at `/app/reader.jar`
 and the prod profile at `/app/conf/prod.edn`. The image splits
-`ENTRYPOINT ["java", "-cp", "/app/conf:/app/reader.jar"]` (the JVM prefix)
-from `CMD ["reader.main", "prod.edn"]` (the app server) — so Fly's
-`release_command` (run as ENTRYPOINT + command) cleanly becomes
+`ENTRYPOINT ["java", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-cp", "/app/conf:/app/reader.jar"]`
+(the JVM prefix) from `CMD ["reader.main", "prod.edn"]` (the app server) —
+so Fly's `release_command` (run as ENTRYPOINT + command) cleanly becomes
 `java … reader.migrate prod.edn` rather than extra args to `reader.main`.
 
 ### Automatic (the normal path)
@@ -231,6 +231,14 @@ Every push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 Fly's `min_machines_running = 0` means the machine stops when idle
 and auto-starts on the first request. Health checks hit `/health`
 every 30s while running.
+
+Because the machine scales to zero, the JVM cold boot is on the
+request path, and Fly's proxy only waits ~8s for the app to bind the
+port. To keep boot under that window the whole app is AOT-compiled
+(see [`build.clj`](build.clj)) and the JVM starts with `-XX:+UseSerialGC
+-XX:TieredStopAtLevel=1`, on a 1gb VM. Rationale and the further levers
+(AppCDS, a warm machine) are in
+[ADR 0004 → Cold-start tuning](docs/adr/0004-deployment-and-infrastructure.md#cold-start-tuning-amended-2026-06-21).
 
 ### Manual
 
@@ -400,44 +408,48 @@ tag set stays small instead of fragmenting. Tags surface as chips on the list
 view. The decision record is [ADR 0005](docs/adr/0005-auto-tagging.md).
 
 Both the LLM and the embedder are **pluggable, OpenAI-compatible HTTP clients**
-(`reader.ai/complete` and `reader.ai/embed`) — point them at OpenAI, Groq, a
-local Ollama/llamafile, or anything that speaks `/chat/completions` and
-`/embeddings`. No vendor lock-in, no new dependencies. Embeddings are stored as
-plain `jsonb` arrays and compared in Clojure (no pgvector); they also seed the
-planned "more like this" feature.
+(`reader.ai/complete` and `reader.ai/embed`). They **default to
+[OpenRouter](https://openrouter.ai)**, but point them at OpenAI, Groq, a local
+Ollama/llamafile, or anything that speaks `/chat/completions` and `/embeddings`.
+No vendor lock-in, no new dependencies. The tagger asks for **strict Structured
+Outputs** (`:response-format :json-schema`) so the model is constrained to the tag
+shape; a Malli boundary still validates regardless of provider. Embeddings are
+stored as plain `jsonb` arrays and compared in Clojure (no pgvector); they also
+seed the planned "more like this" feature.
 
-**In dev, tagging needs no setup.** With the model endpoints unset, the job runs
-a **stub tagger** (a couple of title-derived tags) and a deterministic stub
-embedder, so the whole pipeline — tag rows, dedup, the filter UI — works offline
-against the throwaway dev DB. To exercise a real model, set the endpoints in your
-shell before `bb dev` (a local Ollama needs no key):
+**In dev, tagging needs no setup.** With no API key set, the job runs a **stub
+tagger** (a couple of title-derived tags) and a deterministic stub embedder, so
+the whole pipeline — tag rows, dedup, the filter UI — works offline against the
+throwaway dev DB. To exercise a real model, set the keys before `bb dev` (the URL
+defaults to OpenRouter; override `*_API_URL` / `*_MODEL` for another endpoint):
 
 ```sh
-# OpenAI
+# OpenRouter (default endpoint — just add keys)
+export LLM_API_KEY=sk-or-…   EMBED_API_KEY=sk-or-…
+# …or OpenAI direct (bare model ids)
 export LLM_API_URL=https://api.openai.com/v1   LLM_API_KEY=sk-…   LLM_MODEL=gpt-4o-mini
 export EMBED_API_URL=https://api.openai.com/v1 EMBED_API_KEY=sk-… EMBED_MODEL=text-embedding-3-small
-# …or a local Ollama (no key)
-export LLM_API_URL=http://localhost:11434/v1   LLM_MODEL=llama3.2
-export EMBED_API_URL=http://localhost:11434/v1 EMBED_MODEL=nomic-embed-text
+# …or a local Ollama (any non-empty key — Ollama ignores it)
+export LLM_API_URL=http://localhost:11434/v1   LLM_API_KEY=ollama LLM_MODEL=llama3.2
+export EMBED_API_URL=http://localhost:11434/v1 EMBED_API_KEY=ollama EMBED_MODEL=nomic-embed-text
 ```
 
 **In prod, tagging is gated on real credentials.** `:require-model?` is set, so
-until *both* the LLM and embedding endpoints are configured the job records a
-`:skipped` event and **reschedules itself** rather than writing stub tags into
-the shared corpus. The moment the secrets land, the backlog tags itself. All six
-values are `#env/opt`, so the app boots and deploys before they're set:
+until *both* the LLM and embedding clients have an API key the job records a
+`:skipped` event and **reschedules itself** rather than writing stub tags into the
+shared corpus. The moment the secrets land, the backlog tags itself. Every value
+is `#env/opt`, so the app boots and deploys before they're set — and with
+OpenRouter the default, two keys are enough:
 
 ```sh
-flyctl secrets set \
-  LLM_API_URL="https://api.openai.com/v1"   LLM_API_KEY="sk-…"   LLM_MODEL="gpt-4o-mini" \
-  EMBED_API_URL="https://api.openai.com/v1" EMBED_API_KEY="sk-…" EMBED_MODEL="text-embedding-3-small"
+flyctl secrets set LLM_API_KEY="sk-or-…" EMBED_API_KEY="sk-or-…"
 ```
 
 | Secret | What it is |
 | ------ | ---------- |
-| `LLM_API_URL` / `EMBED_API_URL` | Base URLs of OpenAI-compatible chat-completions / embeddings endpoints. **Both** must be set for tagging to run; either unset → the job skips and reschedules |
-| `LLM_API_KEY` / `EMBED_API_KEY` | Bearer tokens (omit for a local model with no auth) |
-| `LLM_MODEL` / `EMBED_MODEL`     | Model ids (default `gpt-4o-mini` / `text-embedding-3-small`) |
+| `LLM_API_KEY` / `EMBED_API_KEY` | Bearer tokens, and the activation switch: **both** must be set for tagging to run; either unset → the job skips and reschedules. A keyless local endpoint takes any non-empty placeholder |
+| `LLM_API_URL` / `EMBED_API_URL` | Base URLs of OpenAI-compatible chat-completions / embeddings endpoints. Default to OpenRouter (`https://openrouter.ai/api/v1`); override for another provider |
+| `LLM_MODEL` / `EMBED_MODEL`     | Model ids (default `openai/gpt-4o-mini` / `openai/text-embedding-3-small`); OpenRouter uses `provider/model` form, OpenAI direct uses bare ids |
 
 A failed tag job retries with the same backoff as any job, and is fatal only
 when the readable is gone or the model breaks its output contract; a permanently

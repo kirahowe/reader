@@ -278,6 +278,14 @@ The boring-but-important stuff before this is the daily-driver.
 - A `bb backup` task that snapshots Neon to R2 nightly.
 - Deploy gates: CI must be green and tests must include each new
   domain.
+- **Cold-start performance.** First pass shipped (2026-06-21): full-app
+  AOT + JVM fast-start flags + 1gb VM keep boot under Fly's ~8s proxy
+  window without giving up scale-to-zero (see [ADR 0004 → Cold-start
+  tuning](./adr/0004-deployment-and-infrastructure.md#cold-start-tuning-amended-2026-06-21)).
+  Next levers if cold hits still miss the window: an AppCDS archive baked
+  at build time, Clojure direct-linking at AOT, and worker poll-backoff —
+  the last unlocks a warm machine (`min_machines_running = 1`) as a hard
+  guarantee without keeping Neon awake.
 
 **Done when**
 - Production has been left alone for a week with no operational

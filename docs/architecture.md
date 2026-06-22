@@ -269,3 +269,10 @@ The uberjar is built in a multi-stage Docker image (`eclipse-temurin:25-jdk`
 build → `:25-jre` runtime). Fly runs the migration as a `release_command`
 before swapping in the new machines, so a broken migration fails the deploy.
 Every step is invocable as `bb <task>` locally; CI is a thin shim.
+
+The machine scales to zero, so the JVM cold boot sits on the request path.
+To keep boot-to-listen inside Fly's ~8s proxy window, the build AOT-compiles
+every namespace (otherwise the EDN-wired, runtime-loaded namespaces would
+compile from source on each boot) and the runtime adds `-XX:+UseSerialGC
+-XX:TieredStopAtLevel=1` on a 1gb VM. See [ADR 0004 → Cold-start
+tuning](./adr/0004-deployment-and-infrastructure.md#cold-start-tuning-amended-2026-06-21).

@@ -16,7 +16,10 @@
     (is (== -1.0 (tags/cosine [1.0 0.0] [-1.0 0.0]))))
   (testing "an empty vector is 0.0, never a divide-by-zero"
     (is (== 0.0 (tags/cosine [] [1.0])))
-    (is (== 0.0 (tags/cosine [0.0 0.0] [1.0 1.0])))))
+    (is (== 0.0 (tags/cosine [0.0 0.0] [1.0 1.0]))))
+  (testing "different lengths are incomparable embedding spaces -> 0.0, never a spurious score"
+    (is (== 0.0 (tags/cosine [1.0 0.0 0.0] [1.0 0.0])))
+    (is (== 0.0 (tags/cosine [1.0] [1.0 0.0 0.0])))))
 
 (deftest nearest-test
   (let [vocab [{:id 1 :slug "a" :label "A" :embedding [1.0 0.0 0.0]}

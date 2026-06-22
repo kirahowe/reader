@@ -33,9 +33,12 @@
 
 (defn cosine
   "Cosine similarity of two numeric vectors, in [-1.0, 1.0]. 0.0 when either is
-   empty or has zero magnitude. Compares over the shorter length."
+   empty, has zero magnitude, or the two differ in length — a length mismatch
+   means different embedding spaces (a model/dimensions change), which aren't
+   comparable, so treat them as unrelated rather than truncating to a spurious
+   score that could wrongly merge or split the vocabulary."
   [a b]
-  (if (or (empty? a) (empty? b))
+  (if (or (empty? a) (empty? b) (not= (count a) (count b)))
     0.0
     (let [dot (reduce + (map * a b))
           ma  (Math/sqrt (reduce + (map #(* % %) a)))

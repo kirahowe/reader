@@ -76,6 +76,24 @@
         (is (empty? (crud/find-many ds :readable-tags {:readable-id aid})))
         (is (empty? (crud/find-many ds :readable-embeddings {:readable-id aid})))))))
 
+(deftest tag-readable!-embed-count-mismatch-test
+  (with-system [system]
+    (let [ds  (:reader.db/datasource system)
+          aid (:articles/id (seed-article ds))
+          ;; A provider that drops rows: one vector back regardless of input count,
+          ;; which would misalign labels to embeddings if we zipped them blindly.
+          bad (assoc deps :embed (fn [_inputs] [[1.0 0.0]]))]
+      (testing "a short embedding batch is a retryable failure, not a misaligned write"
+        (let [ex (try (job/tag-readable! ds {:readable-type "article" :readable-id (str aid)} bad)
+                      nil
+                      (catch clojure.lang.ExceptionInfo e e))]
+          (is (= :embedding-count-mismatch (:error-class (ex-data ex))))
+          (is (not (:fatal? (ex-data ex))) "retryable — a transient provider hiccup"))
+        (is (= "failed" (:tagging-events/outcome
+                         (first (crud/find-many ds :tagging-events {:readable-id aid})))))
+        (is (empty? (crud/find-many ds :readable-tags {:readable-id aid}))
+            "no partial baseline written")))))
+
 (deftest skip-readable!-records-and-reschedules-test
   (with-system [system]
     (let [ds  (:reader.db/datasource system)

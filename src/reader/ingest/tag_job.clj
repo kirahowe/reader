@@ -94,7 +94,15 @@
             result    (coerce+validate (infer-tags content existing))
             proposals (:tags result)
             ;; One embed call: the readable doc first, then each proposed label.
-            [doc-vec & label-vecs] (embed (cons (doc-text content) (map :label proposals)))
+            ;; A provider returning the wrong batch size would silently misalign
+            ;; labels to vectors, so verify the count before zipping them.
+            vectors   (embed (cons (doc-text content) (map :label proposals)))
+            _         (when (not= (count vectors) (inc (count proposals)))
+                        (throw (ex-info "embedding count did not match inputs"
+                                        {:error-class :embedding-count-mismatch
+                                         :expected (inc (count proposals))
+                                         :got (count vectors)})))
+            [doc-vec & label-vecs] vectors
             duration  (elapsed-ms t0)]
         (jdbc/with-transaction [tx ds]
           (let [entries (tags/resolve-tags! tx threshold

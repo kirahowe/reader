@@ -28,6 +28,27 @@
           (is (= "http://m/chat/completions" (:url (first @calls))))
           (is (= "gpt-x" (:model (:body (first @calls))))))))))
 
+(deftest complete-options-test
+  (let [calls (atom [])]
+    (with-redefs [http/post! (responding calls (ok {:choices [{:message {:content "{}"}}]}))]
+      (testing "a :json-schema descriptor becomes a strict Structured Outputs response_format"
+        (ai/complete {:api-url "http://m" :model "x"} [{:role "user" :content "hi"}]
+                     {:response-format {:mode :json-schema :name "tags" :schema {:type "object"}}})
+        (let [rf (:response_format (:body (last @calls)))]
+          (is (= "json_schema" (:type rf)))
+          (is (= "tags" (get-in rf [:json_schema :name])))
+          (is (true? (get-in rf [:json_schema :strict])))
+          (is (= {:type "object"} (get-in rf [:json_schema :schema])))))
+      (testing "a :json-object descriptor becomes JSON mode"
+        (ai/complete {:api-url "http://m" :model "x"} [] {:response-format :json-object})
+        (is (= {:type "json_object"} (:response_format (:body (last @calls))))))
+      (testing "no descriptor omits response_format entirely (free-text providers)"
+        (ai/complete {:api-url "http://m" :model "x"} [])
+        (is (not (contains? (:body (last @calls)) :response_format))))
+      (testing ":max-tokens from config caps the generation"
+        (ai/complete {:api-url "http://m" :model "x" :max-tokens 256} [])
+        (is (= 256 (:max_tokens (:body (last @calls)))))))))
+
 (deftest embed-test
   (let [calls (atom [])]
     (with-redefs [http/post! (responding calls (ok {:data [{:index 1 :embedding [0.0 1.0]}

@@ -213,16 +213,6 @@ main {
 }
 .page-head h1 { margin: 0; }
 .page-sub { margin: var(--s-2) 0 0; font-size: 0.9rem; }
-.ghost-link {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--accent);
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-sm);
-  white-space: nowrap;
-}
-.ghost-link:hover { background: var(--accent-tint); border-color: var(--accent-2); color: var(--accent); }
 
 /* ---- Back nav (reader, sub-pages) --------------------------- */
 .backnav { margin-bottom: var(--s-5); font-size: 0.875rem; }
@@ -354,7 +344,7 @@ main {
 .form { max-width: 32rem; }
 .form label { display: block; margin-bottom: var(--s-5); }
 .form .label-text { display: block; margin-bottom: var(--s-2); font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
-.form input, .form textarea, .form select {
+.form input {
   font: inherit;
   width: 100%;
   padding: var(--s-3) var(--s-4);
@@ -364,14 +354,11 @@ main {
   color: inherit;
   transition: border-color .15s, box-shadow .15s;
 }
-.form input:focus, .form textarea:focus, .form select:focus {
+.form input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);
 }
-.form input:focus:not(:focus-visible),
-.form textarea:focus:not(:focus-visible),
-.form select:focus:not(:focus-visible) { outline: none; }
-.form textarea { min-height: 7rem; resize: vertical; }
+.form input:focus:not(:focus-visible) { outline: none; }
 .form .error { color: var(--gold); font-size: 0.8125rem; margin-top: var(--s-1); }
 .form .btn--primary { padding-inline: var(--s-5); }
 

@@ -96,7 +96,7 @@
       (testing "Unknown routes return 404"
         (is (= 404 (:status (-> (mock/request :get "/no-such-route") handler))))))))
 
-(deftest article-create-and-archive
+(deftest queue-archive
   (with-system [system]
     (let [ds       (:reader.db/datasource system)
           handler  (:reader.concerns.reitit/ring-handler system)
@@ -104,64 +104,24 @@
                      (re-find (re-pattern needle)
                               (:body (-> (mock/request :get "/") test-auth/authed handler))))]
 
-      (testing "GET /articles/new renders the form"
-        (let [{:keys [status body]} (-> (mock/request :get "/articles/new") test-auth/authed handler)]
-          (is (= 200 status))
-          (is (re-find #"(?i)<form" body))
-          (is (re-find #"canonical-url" body))))
+      ;; Seed a queued readable directly for the invited user — the manual-add
+      ;; form is gone, so build the row rather than POSTing it through a handler.
+      (let [uid (:users/id (crud/create! ds :users {:email test-auth/invited-email}))
+            aid (:articles/id (crud/create! ds :articles
+                                            {:title         "A Hand-Added Piece"
+                                             :slug          "a-hand-added-piece"
+                                             :canonical-url "https://example.com/hand-added"}))
+            qid (:queue-items/id (reading/enqueue! ds uid "article" aid))]
 
-      (testing "POST /articles with valid input creates the article, queues it, and redirects"
-        (let [{:keys [status headers]}
-              (-> (mock/request :post "/articles"
-                                {"title"         "A Hand-Added Piece"
-                                 "canonical-url" "https://example.com/hand-added"})
-                  test-auth/authed handler)]
-          (is (= 303 status))
-          (is (= "/" (get headers "location")))
-          (is (on-home? "A Hand-Added Piece") "the new article shows on the reading list")))
+        (testing "the queued item shows on the reading list"
+          (is (on-home? "A Hand-Added Piece")))
 
-      (testing "POST /articles with a duplicate URL re-renders the form, no 500"
-        ;; The create+enqueue transaction must survive create!'s caught unique
-        ;; violation: the article insert rolls back and we re-render, not 500.
-        (let [{:keys [status body]}
-              (-> (mock/request :post "/articles"
-                                {"title"         "A Hand-Added Piece, Again"
-                                 "canonical-url" "https://example.com/hand-added"})
-                  test-auth/authed handler)]
-          (is (= 200 status) "not a 500 from the aborted insert")
-          (is (re-find #"(?i)already exists" body) "the duplicate-URL error shows")))
-
-      (testing "POST /articles with an unknown affiliation-id re-renders the form, no 500"
-        ;; A well-formed but non-existent affiliation-id passes validation and
-        ;; trips the FK on insert; like the duplicate-URL case it must come back
-        ;; as a visible form error, not a 500 from the aborted insert.
-        (let [{:keys [status body]}
-              (-> (mock/request :post "/articles"
-                                {"title"          "Orphaned Submission"
-                                 "canonical-url"  "https://example.com/orphan-http"
-                                 "affiliation-id" "00000000-0000-0000-0000-0000000000ff"})
-                  test-auth/authed handler)]
-          (is (= 200 status) "not a 500 from the aborted insert")
-          (is (re-find #"(?i)unknown source" body) "the unknown-affiliation error shows")))
-
-      (testing "POST /articles with a blank title re-renders the form and writes nothing"
-        (let [{:keys [status body]}
-              (-> (mock/request :post "/articles"
-                                {"title" "" "canonical-url" "https://example.com/rejected"})
-                  test-auth/authed handler)]
-          (is (= 200 status))
-          (is (re-find #"(?i)<form" body))
-          (is (nil? (crud/find-1 ds :articles {:canonical-url "https://example.com/rejected"})))))
-
-      (testing "POST /queue/:id/archive removes the item from the reading list"
-        (let [uid (:users/id (crud/find-1 ds :users {:email test-auth/invited-email}))
-              aid (:articles/id (crud/find-1 ds :articles {:canonical-url "https://example.com/hand-added"}))
-              qid (:queue-items/id (crud/find-1 ds :queue-items {:user-id uid :readable-id aid}))
-              {:keys [status headers]} (-> (mock/request :post (str "/queue/" qid "/archive"))
-                                           test-auth/authed handler)]
-          (is (= 303 status))
-          (is (= "/" (get headers "location")))
-          (is (not (on-home? "A Hand-Added Piece")) "it is gone from the reading list")))
+        (testing "POST /queue/:id/archive removes the item from the reading list"
+          (let [{:keys [status headers]} (-> (mock/request :post (str "/queue/" qid "/archive"))
+                                             test-auth/authed handler)]
+            (is (= 303 status))
+            (is (= "/" (get headers "location")))
+            (is (not (on-home? "A Hand-Added Piece")) "it is gone from the reading list"))))
 
       (testing "POST /queue/:id/archive with a non-uuid id 404s"
         (is (= 404 (:status (-> (mock/request :post "/queue/not-a-uuid/archive")
@@ -184,18 +144,16 @@
     (let [handler (:reader.concerns.reitit/ring-handler system)]
 
       (testing "a cross-origin POST is rejected before reaching the handler"
-        (let [{:keys [status body]} (-> (mock/request :post "/articles"
-                                                      {"title"         "Should Not Land"
-                                                       "canonical-url" "https://example.com/csrf"})
+        (let [{:keys [status body]} (-> (mock/request :post "/readables"
+                                                      {"url" "https://example.com/csrf"})
                                         (mock/header "origin" "https://evil.test")
                                         test-auth/authed handler)]
           (is (= 403 status) "blocked by CSRF even with a valid session")
           (is (= "bad origin" body))))
 
       (testing "a same-origin POST passes the gate through to the handler"
-        (let [{:keys [status]} (-> (mock/request :post "/articles"
-                                                 {"title"         "A Same-Origin Piece"
-                                                  "canonical-url" "https://example.com/same-origin"})
+        (let [{:keys [status]} (-> (mock/request :post "/readables"
+                                                 {"url" "https://example.com/same-origin"})
                                    (mock/header "origin" "http://localhost")
                                    test-auth/authed handler)]
           (is (= 303 status) "matching origin reaches the create handler and redirects"))))))

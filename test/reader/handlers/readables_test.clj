@@ -82,7 +82,7 @@
             (is (not (str/includes? (:body resp) "add manually")) "no misleading article-only fallback")
             (is (not (str/includes? (:body resp) "Importing")) "terminal — polling stops")))))))
 
-(deftest failed-row-offers-manual-add-only-for-articles-test
+(deftest failed-row-is-terminal-test
   (with-system [system]
     (let [ds     (:reader.db/datasource system)
           create (:reader.handlers.readables/create system)
@@ -91,17 +91,18 @@
           fail!  (fn [queue-name] (jobs/fail! ds (jobs/claim-next! ds queue-name) "boom" {:fatal? true}))
           row-of (fn [qid] (:body (row {:user-id uid :path-params {:id (str qid)}})))]
 
-      (testing "a failed article offers the manual add fallback"
+      (testing "a permanently failed article renders a terminal row — archive only, no manual-add"
         (create {:user-id uid :params {"url" "https://example.com/dead-article"} :headers {"hx-request" "true"}})
         (fail! "extract-article")
         (let [qi   (crud/find-1 ds :queue-items {:user-id uid :readable-type "article"})
               body (row-of (:queue-items/id qi))]
           (is (str/includes? body "Couldn’t import"))
-          (is (str/includes? body "add manually") "articles have a manual entry form to fall back to")))
+          (is (str/includes? body "/archive") "the only action is to archive it")
+          (is (not (str/includes? body "add manually")) "the manual-add form is gone")))
 
-      (testing "a failed paper does not — there's no manual paper form to point at"
+      (testing "a permanently failed paper is likewise terminal"
         (let [{:keys [queue-item]} (papers/start! ds uid {:kind :doi :id "10.7/dead"})]
           (fail! "extract-paper")
           (let [body (row-of (:queue-items/id queue-item))]
             (is (str/includes? body "Couldn’t import"))
-            (is (not (str/includes? body "add manually")) "no article-only fallback for a paper")))))))
+            (is (not (str/includes? body "add manually")))))))))

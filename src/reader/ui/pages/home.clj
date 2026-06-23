@@ -56,16 +56,12 @@
 
 (defn failed-row
   "A queue row for a readable whose import permanently failed. No polling — this is
-   terminal. Articles offer the manual add form as a fallback; papers and
-   newsletters have no manual entry path, so `type` gates that link off rather than
-   pointing them at the article-only form."
-  [queue-item-id label type]
+   terminal; the only action is to archive it."
+  [queue-item-id label]
   [:li.readable.failed {:id (str "q-" queue-item-id)}
    [:div.readable-text
     [:h2.readable-title "Couldn’t import"]
-    (into [:div.readable-meta [:span.meta-item [:span.import-url label]]]
-          (when (= type :article)
-            [[:span.meta-item [:a {:href "/articles/new"} "add manually"]]]))]
+    [:div.readable-meta [:span.meta-item [:span.import-url label]]]]
    [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
     (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-trash)]])
 
@@ -107,8 +103,7 @@
    "Reader" :queue
    (list
     (c/page-head "Your reading list"
-                 (when (seq readables) (subtitle readables))
-                 (c/link-button "/articles/new" "+ Add manually"))
+                 (when (seq readables) (subtitle readables)))
     [:form.add-url {:method  "post" :action "/readables"
                     :hx-post "/readables" :hx-target "#readables-list" :hx-swap "afterbegin"}
      [:span.add-url-icon {:aria-hidden "true"} "+"]

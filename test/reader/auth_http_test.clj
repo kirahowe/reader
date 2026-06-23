@@ -25,7 +25,7 @@
           (is (= "/login" (get headers "location")))))
 
       (testing "a protected non-GET without a session is 401, not a redirect"
-        (is (= 401 (:status (-> (mock/request :post "/articles") handler)))))
+        (is (= 401 (:status (-> (mock/request :post "/readables") handler)))))
 
       (testing "an invited user is admitted and provisioned on first request"
         (let [{:keys [status]} (-> (mock/request :get "/") test-auth/authed handler)]

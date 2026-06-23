@@ -55,5 +55,5 @@
          (case (ingest-status datasource item)
            :done        (home/item item)
            :not-indexed (home/unavailable-row id (:title item))
-           :failed      (home/failed-row id (:title item) (:type item))
+           :failed      (home/failed-row id (:title item))
            (home/importing-row id (:title item))))))))

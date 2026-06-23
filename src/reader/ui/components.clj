@@ -80,12 +80,6 @@
                   (update :class #(classes % (button-variant (:variant opts)))))]
     (into [:button attrs] content)))
 
-(defn link-button
-  "An <a> that looks like the quiet ghost button (used for secondary page
-   actions like “Add manually”)."
-  [href label]
-  [:a.ghost-link {:href href} label])
-
 ;; ---------------------------------------------------------------------------
 ;; Chips — small status pills. nil variant is the accent chip; pass a keyword
 ;; (`:read`, `:reading`) for a modifier.
@@ -139,18 +133,3 @@
   ([label input-name value error] (text-field label input-name value error "text"))
   ([label input-name value error input-type]
    (field label [:input {:type input-type :name input-name :value value}] error)))
-
-(defn textarea-field [label input-name value error]
-  (field label [:textarea {:name input-name} value] error))
-
-(defn select-field
-  "`options` is a seq of {:value :label} maps; `selected` is the chosen value."
-  [label input-name options selected error]
-  (field label
-         (into [:select {:name input-name}]
-               (map (fn [{:keys [value label]}]
-                      [:option (cond-> {:value value}
-                                 (= value selected) (assoc :selected true))
-                       label])
-                    options))
-         error))

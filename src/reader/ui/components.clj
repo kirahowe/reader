@@ -63,6 +63,17 @@
   [text]
   [:span.kicker text])
 
+(defn readable-list
+  "A <ul> of readables, each title linking out to its external original — or shown
+   as plain text when it has none (a paper with no DOI/arXiv id; the in-app reader
+   view is owner-scoped per queue item, so it isn't linked from a browse page).
+   `items` are normalized readables ({:title :url})."
+  [items]
+  (into [:ul.entities]
+        (map (fn [{:keys [title url]}]
+               [:li (if url [:a {:href url} title] title)]))
+        items))
+
 ;; ---------------------------------------------------------------------------
 ;; Buttons — a bare <button> is the quiet secondary control; `:variant` adds a
 ;; modifier. `:primary` fills with the accent, `:icon` is a quiet glyph button,

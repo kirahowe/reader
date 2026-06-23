@@ -340,6 +340,11 @@ main {
 .entities li a:hover { color: var(--accent); }
 .entities .entity-type { font-family: var(--font-ui); font-size: 0.8125rem; color: var(--muted); }
 
+/* ---- Entity show pages (author / source: lead + sections) --- */
+.entity-section { margin-top: var(--s-6); }
+.entity-lead { color: var(--ink-soft); max-width: 42rem; }
+.entity-meta { color: var(--muted); font-size: 0.9rem; display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
 /* ---- Forms -------------------------------------------------- */
 .form { max-width: 32rem; }
 .form label { display: block; margin-bottom: var(--s-5); }

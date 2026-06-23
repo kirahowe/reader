@@ -37,11 +37,14 @@
 (defn- finalize!
   "The write body of `persist!`, scoped to an existing transaction `tx`: resolve
    & set the affiliation, write the extracted fields/body, and (re)attach
-   authorships in byline order. The authorship inserts are safe without
-   authorships/attach!'s own existence check + lock: the article row is locked
-   by our UPDATE in this same tx. Returns the finalized article row."
+   authorships in byline order. This writes the article→source and author→article
+   edges; the author→source 'published in' edge is *derived* from them, not stored
+   (see reader.domain.readables/by-author). The authorship inserts are safe without
+   authorships/attach!'s own existence check + lock: the article row is locked by
+   our UPDATE in this same tx. Returns the finalized article row."
   [tx article-id extract entities]
-  (let [aff   (some->> (:affiliation entities) :name (affiliations/find-or-create! tx))
+  (let [aff   (when-let [a (:affiliation entities)]
+                (affiliations/find-or-create! tx (:name a) (:url a)))
         attrs (articles/ingest-attrs extract (:affiliations/id aff) (Instant/now))]
     (crud/update! tx :articles article-id attrs)
     (clear-authorships! tx "article" article-id)

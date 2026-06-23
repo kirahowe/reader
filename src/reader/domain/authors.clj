@@ -103,22 +103,24 @@
   [ds slug]
   (crud/find-1 ds :authors {:slug slug}))
 
-(defn affiliations-of
-  "The outlets `author-id` writes for, joined to the affiliation rows and
-   flattened to {:name :slug :type :role :primary?}, primary first then by
-   name. Two small reads joined in Clojure — keeps the result-set builder off a
-   multi-table join — fetching only the affiliations this author links to."
+(defn institutions-of
+  "The institutions `author-id` is affiliated with — the academic sense, sourced
+   from papers (OpenAlex). Reads the author_affiliations links and keeps only those
+   whose affiliation is an institution; the editorial 'published in' relationship
+   is *derived* from an author's works, not stored here (see
+   reader.domain.readables/by-author). Returns {:name :slug :primary?}, primary
+   first then by name. Two small reads joined in Clojure — fetching only the
+   affiliations this author links to."
   [ds author-id]
   (let [links (crud/find-many ds :author-affiliations {:author-id author-id})
-        affs  (into {} (map (juxt :affiliations/id identity))
+        insts (into {} (comp (filter #(= "institution" (:affiliations/type %)))
+                             (map (juxt :affiliations/id identity)))
                     (crud/find-in ds :affiliations :id (map :author-affiliations/affiliation-id links)))]
     (->> links
-         (map (fn [link]
-                (let [a (get affs (:author-affiliations/affiliation-id link))]
-                  {:name     (:affiliations/name a)
-                   :slug     (:affiliations/slug a)
-                   :type     (:affiliations/type a)
-                   :role     (:author-affiliations/role link)
-                   :primary? (:author-affiliations/is-primary link)})))
+         (keep (fn [link]
+                 (when-let [a (insts (:author-affiliations/affiliation-id link))]
+                   {:name     (:affiliations/name a)
+                    :slug     (:affiliations/slug a)
+                    :primary? (:author-affiliations/is-primary link)})))
          (sort-by (juxt (complement :primary?) :name))
          vec)))

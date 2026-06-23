@@ -34,7 +34,10 @@
    [:map {:closed true}
     [:name [:string {:min 1 :max 200}]]
     [:source Source]
-    [:confidence Confidence]]])
+    [:confidence Confidence]
+    ;; Optional homepage URL (the publication's site origin), so the source is a
+    ;; real graph node, not just a name. Present when the page's URL is parseable.
+    [:url {:optional true} :string]]])
 
 (def EntityResult
   "Output contract of the entity-extraction abstraction. The 50-author / 200-char

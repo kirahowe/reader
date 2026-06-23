@@ -117,29 +117,31 @@
           (is (not= (:authors/id a) (:authors/id b)) "different ORCID → two authors")
           (is (not= (:authors/slug a) (:authors/slug b)) "slugs disambiguated"))))))
 
-(deftest affiliations-of-test
+(deftest institutions-of-test
   (with-system [system]
-    (let [ds      (:reader.db/datasource system)
-          didion  (authors/create! ds {:name "Joan Didion" :slug "jd"})
-          smith   (authors/create! ds {:name "Zadie Smith" :slug "zs"})
-          ny      (crud/create! ds :affiliations {:name "The New Yorker" :slug "tny" :type "magazine"})
-          harpers (crud/create! ds :affiliations {:name "Harper's" :slug "harpers" :type "magazine"})]
+    (let [ds       (:reader.db/datasource system)
+          didion   (authors/create! ds {:name "Joan Didion" :slug "jd"})
+          smith    (authors/create! ds {:name "Zadie Smith" :slug "zs"})
+          stanford (crud/create! ds :affiliations {:name "Stanford" :slug "stanford" :type "institution"})
+          mit      (crud/create! ds :affiliations {:name "MIT" :slug "mit" :type "institution"})
+          nyer     (crud/create! ds :affiliations {:name "The New Yorker" :slug "tny" :type "magazine"})]
       (crud/create! ds :author-affiliations {:author-id      (:authors/id didion)
-                                             :affiliation-id (:affiliations/id ny)
-                                             :role           "staff writer"
+                                             :affiliation-id (:affiliations/id stanford)
                                              :is-primary     true})
       (crud/create! ds :author-affiliations {:author-id      (:authors/id didion)
-                                             :affiliation-id (:affiliations/id harpers)
-                                             :role           "contributor"
+                                             :affiliation-id (:affiliations/id mit)
+                                             :is-primary     false})
+      ;; A publication link must NOT surface as an institutional affiliation —
+      ;; "published in" is derived from works, not stored here.
+      (crud/create! ds :author-affiliations {:author-id      (:authors/id didion)
+                                             :affiliation-id (:affiliations/id nyer)
                                              :is-primary     false})
 
-      (testing "returns the author's affiliations, primary first"
-        (let [affs (authors/affiliations-of ds (:authors/id didion))]
-          (is (= ["The New Yorker" "Harper's"] (map :name affs))
-              "the primary affiliation sorts ahead of the rest")
-          (is (= {:name "The New Yorker" :slug "tny" :type "magazine"
-                  :role "staff writer" :primary? true}
-                 (first affs)))))
+      (testing "returns only institutions, primary first then by name"
+        (let [insts (authors/institutions-of ds (:authors/id didion))]
+          (is (= ["Stanford" "MIT"] (map :name insts))
+              "the primary institution sorts ahead; the magazine is excluded")
+          (is (= {:name "Stanford" :slug "stanford" :primary? true} (first insts)))))
 
-      (testing "an author with no affiliations yields an empty seq"
-        (is (= [] (authors/affiliations-of ds (:authors/id smith))))))))
+      (testing "an author with no institutional affiliations yields an empty seq"
+        (is (= [] (authors/institutions-of ds (:authors/id smith))))))))

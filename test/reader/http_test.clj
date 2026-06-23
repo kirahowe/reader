@@ -66,21 +66,49 @@
           (is (re-find #"Joan Didion" body))
           (is (re-find #"/authors/joan-didion" body))))
 
-      (testing "GET /authors/:slug shows the author and their affiliation"
+      (testing "GET /authors/:slug shows the sources they've published in and their works"
         (let [{:keys [status body]} (-> (mock/request :get "/authors/joan-didion") test-auth/authed handler)]
           (is (= 200 status))
           (is (re-find #"Joan Didion" body))
-          (is (re-find #"(?i)writes for" body))
-          (is (re-find #"The New Yorker" body) "the author's affiliation shows")))
+          (is (re-find #"(?i)published in" body))
+          (is (re-find #"/affiliations/the-new-yorker" body)
+              "a source the author has published in links to its page")
+          (is (re-find #"(?i)>Works<" body) "the works section is present")
+          (is (re-find #"The White Album" body) "a work credited to the author shows")
+          (is (re-find #"href=\"https://www\.newyorker\.com/the-white-album\"" body)
+              "the work links out to the original, not a gated reader view")))
+
+      (testing "GET /authors/:slug separates institutional affiliation from where they've published"
+        (let [{:keys [status body]} (-> (mock/request :get "/authors/ashish-vaswani") test-auth/authed handler)]
+          (is (= 200 status))
+          (is (re-find #"(?i)affiliated with" body) "the institutions section is present")
+          (is (re-find #"Google" body) "the institution shows")
+          (is (re-find #"(?i)published in" body))
+          (is (re-find #"arXiv" body) "the paper's venue shows as a publication, not an institution")))
 
       (testing "GET /authors/:slug 404s for an unknown author"
         (is (= 404 (:status (-> (mock/request :get "/authors/nobody") test-auth/authed handler)))))
 
-      (testing "GET /affiliations lists sources"
+      (testing "GET /affiliations lists sources, each linking to its page, institutions excluded"
         (let [{:keys [status body]} (-> (mock/request :get "/affiliations") test-auth/authed handler)]
           (is (= 200 status))
           (is (re-find #"The New Yorker" body))
-          (is (re-find #"arXiv" body))))
+          (is (re-find #"arXiv" body))
+          (is (re-find #"/affiliations/the-new-yorker" body) "source names link to their page")
+          (is (not (re-find #"/affiliations/google" body)) "an institution is not listed among sources")))
+
+      (testing "GET /affiliations/:slug shows the source's works and authors"
+        (let [{:keys [status body]} (-> (mock/request :get "/affiliations/the-new-yorker") test-auth/authed handler)]
+          (is (= 200 status))
+          (is (re-find #"The New Yorker" body))
+          (is (re-find #"The White Album" body) "a work from this source shows")
+          (is (re-find #"href=\"https://www\.newyorker\.com/the-white-album\"" body)
+              "the work links out to the original")
+          (is (re-find #"Joan Didion" body) "an author who's published in the source shows")
+          (is (re-find #"/authors/joan-didion" body) "the author links to their own page")))
+
+      (testing "GET /affiliations/:slug 404s for an unknown source"
+        (is (= 404 (:status (-> (mock/request :get "/affiliations/nope") test-auth/authed handler)))))
 
       (testing "GET /health returns ok as text/plain"
         (let [{:keys [status headers body]} (-> (mock/request :get "/health") handler)]

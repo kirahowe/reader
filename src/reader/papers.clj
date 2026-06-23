@@ -78,16 +78,6 @@
                                                [:= :readable-type "paper"]
                                                [:= :readable-id paper-id]]})))
 
-(defn- link-author-affiliation!
-  "Idempotently link an author to an institution (author_affiliations). Find-then-
-   create rather than upsert: the unique key is NULLS NOT DISTINCT over
-   (author, affiliation, starts_on), and we only ever write the open-ended
-   (starts_on NULL) link, so a re-run finds the existing row."
-  [tx author-id affiliation-id]
-  (when-not (crud/find-1 tx :author-affiliations {:author-id author-id :affiliation-id affiliation-id})
-    (crud/create! tx :author-affiliations
-                  {:author-id author-id :affiliation-id affiliation-id :role "author"})))
-
 (defn- finalize!
   "Write body of the job, scoped to `tx`: resolve the venue, fill the paper, then
    (re)build the author graph in byline order — each author resolved to a canonical
@@ -116,7 +106,7 @@
         (doseq [inst (:institutions a) :when (:name inst)]
           (let [fid (:affiliations/id (affiliations/resolve! tx (assoc (select-keys inst [:name :ror :openalex-id])
                                                                        :type "institution")))]
-            (link-author-affiliation! tx aid fid)))))
+            (affiliations/link-author! tx aid fid)))))
     (jobs/enqueue! tx "tag-readable" {:readable-type "paper" :readable-id paper-id})
     (crud/by-id tx :papers paper-id)))
 

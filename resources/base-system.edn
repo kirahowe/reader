@@ -22,6 +22,7 @@
    ["/authors"             {:get  {:handler #ig/ref :reader.handlers.authors/index}}]
    ["/authors/:slug"       {:get  {:handler #ig/ref :reader.handlers.authors/show}}]
    ["/affiliations"        {:get  {:handler #ig/ref :reader.handlers.affiliations/index}}]
+   ["/affiliations/:slug"  {:get  {:handler #ig/ref :reader.handlers.affiliations/show}}]
    ["/readables"           {:post {:handler #ig/ref :reader.handlers.readables/create}}]
    ["/queue/:id"           {:get  {:handler #ig/ref :reader.handlers.reader/show}}]
    ["/queue/:id/row"       {:get  {:handler #ig/ref :reader.handlers.readables/row}}]
@@ -47,6 +48,7 @@
  :reader.handlers.authors/index      {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.authors/show       {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.affiliations/index {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.affiliations/show  {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.reader/show        {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.readables/create   {:datasource #ig/ref :reader.db/migrator}
  :reader.handlers.readables/row      {:datasource #ig/ref :reader.db/migrator}

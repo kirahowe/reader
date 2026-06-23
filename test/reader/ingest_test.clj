@@ -58,6 +58,12 @@
                          (map #(:authors/name (crud/by-id ds :authors (:authorships/author-id %)))))]
           (is (= ["Mara Whitfield" "Devon Park"] names))))
 
+      ;; The author<->source "published in" edge is derived (reader.domain.readables/
+      ;; by-author), not stored on ingest — so persist! writes no author_affiliations.
+      (testing "ingest writes no author_affiliations — 'published in' is derived, not stored"
+        (let [fid (:articles/affiliation-id (crud/by-id ds :articles aid))]
+          (is (= 0 (count (crud/find-many ds :author-affiliations {:affiliation-id fid}))))))
+
       (testing "re-running persist! is idempotent — authorships are replaced, not duplicated"
         (ingest/persist! ds aid ex ent)
         (is (= 2 (count (crud/find-many ds :authorships {:readable-id aid}))))))))

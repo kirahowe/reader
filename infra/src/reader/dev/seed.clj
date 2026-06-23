@@ -181,6 +181,14 @@
                                                 :slug "arxiv"
                                                 :type "preprint"
                                                 :url  "https://arxiv.org"})
+        ;; An institution (the academic-affiliation sense) — distinct from a source
+        ;; you read from, so it's excluded from the sources index and only reached
+        ;; from an author's "Affiliated with". The papers/OpenAlex path creates
+        ;; these in prod; seeded here so the author page shows both relationships.
+        google  (crud/create! tx :affiliations {:name "Google"
+                                                :slug "google"
+                                                :type "institution"
+                                                :url  "https://research.google"})
 
         ;; Readables: three articles, two papers, one newsletter issue.
         white     (crud/create! tx :articles
@@ -240,14 +248,11 @@
         test-user (crud/create! tx :users {:email "test@example.com"  :display-name "Test User"})
         marcus    (crud/create! tx :users {:email "marcus@reader.test" :display-name "Marcus Chen"})]
 
-    ;; Author <-> affiliation stints.
-    (crud/create! tx :author-affiliations {:author-id      (:authors/id didion)
-                                           :affiliation-id (:affiliations/id ny)
-                                           :role           "staff writer"
-                                           :is-primary     true})
-    (crud/create! tx :author-affiliations {:author-id      (:authors/id mcphee)
-                                           :affiliation-id (:affiliations/id ny)
-                                           :role           "staff writer"
+    ;; Institutional affiliation (author_affiliations now holds only institutions —
+    ;; the academic sense). Where these authors have *published* is derived from
+    ;; their works, not stored here.
+    (crud/create! tx :author-affiliations {:author-id      (:authors/id vaswani)
+                                           :affiliation-id (:affiliations/id google)
                                            :is-primary     true})
 
     (crud/create! tx :newsletter-sources {:affiliation-id      (:affiliations/id act-nl)

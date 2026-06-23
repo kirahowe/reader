@@ -19,9 +19,11 @@
     (testing "authors come from JSON-LD, in byline order, tagged with provenance"
       (is (= ["Mara Whitfield" "Devon Park"] (mapv :name authors)))
       (is (every? #(= :json-ld (:source %)) authors)))
-    (testing "affiliation is the publication, from og:site_name"
+    (testing "affiliation is the publication, from og:site_name, with its homepage url"
       (is (= "Example News" (:name affiliation)))
-      (is (= :og (:source affiliation))))
+      (is (= :og (:source affiliation)))
+      (is (= "https://www.example-news.com" (:url affiliation))
+          "the source carries its site origin so it's a real graph node"))
     (testing "high overall confidence, and the result satisfies EntityResult"
       (is (> overall-confidence 0.9))
       (is (m/validate schema/EntityResult result)))))

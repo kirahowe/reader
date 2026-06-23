@@ -75,14 +75,27 @@
         (when-let [byline (og-author og)] (mk-authors (names->entries (split-byline byline)) :og))
         [])))
 
+(defn- site-origin
+  "scheme://host for `url` (no path) — the publication's homepage, derived from
+   the article's URL. nil when unparseable."
+  [url]
+  (try
+    (let [u (java.net.URI. (str url))]
+      (when (and (.getScheme u) (.getHost u))
+        (str (.getScheme u) "://" (.getHost u))))
+    (catch Exception _ nil)))
+
 (defn- resolve-affiliation
-  "The publication, lifted from the already-resolved site-name field (keeping
-   its provenance). A model-backed implementation could infer this from the body instead;
-   the contract is the same."
+  "The publication, lifted from the already-resolved site-name field (keeping its
+   provenance), with its homepage URL derived from the page so the source is a
+   first-class node. A model-backed implementation could infer this from the body
+   instead; the contract is the same."
   [context]
   (let [{:keys [value source]} (get-in context [:fields :site-name])]
     (when (blank->nil value)
-      {:name value :source source :confidence (conf-of source)})))
+      (let [origin (site-origin (:url context))]
+        (cond-> {:name value :source source :confidence (conf-of source)}
+          origin (assoc :url origin))))))
 
 (defn- overall [authors affiliation]
   (let [cs (remove nil? (cons (:confidence affiliation) (map :confidence authors)))]

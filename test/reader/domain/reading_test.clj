@@ -153,7 +153,7 @@
           found (readables/find-one ds :article (:articles/id art))]
       (testing "find-one joins the normalized item (title + source) under :item"
         (is (= "On Engines" (-> found :item :title)))
-        (is (= {:name "The Source" :slug "the-source"} (-> found :item :source)))
+        (is (= {:name "The Source" :slug "the-source" :type "magazine"} (-> found :item :source)))
         (is (= [] (-> found :item :authors)) "no authorship -> empty byline"))
       (testing "find-one carries the raw row under :row for type-specific fields"
         (is (= "A note." (-> found :row :articles/abstract)))

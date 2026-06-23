@@ -20,6 +20,7 @@
             [next.jdbc.transaction]
             [reader.domain.authors :as authors]
             [reader.domain.authorships :as authorships]
+            [reader.domain.tags :as tags]
             [reader.db.crud :as crud]
             [reader.inbound :as inbound]
             [reader.ingest :as ingest]
@@ -29,7 +30,8 @@
 (def ^:private seeded-tables
   ["authors" "affiliations" "author_affiliations" "newsletter_sources"
    "articles" "papers" "newsletter_issues" "authorships" "users"
-   "email_inboxes" "queue_items" "jobs"])
+   "email_inboxes" "queue_items" "jobs"
+   "tags" "readable_tags" "queue_item_tags" "readable_embeddings" "tagging_events"])
 
 (def ^:private local-hosts #{"localhost" "127.0.0.1" "::1" "[::1]"})
 
@@ -285,6 +287,23 @@
                              :ordinal           0
                              :contribution-type "guest"})
 
+    ;; Shared baseline tags — what the categorizer assigns. Intrinsic to the
+    ;; content, so keyed on the readable (shared across users), independent of who
+    ;; queued it. Labels are lowercase, matching the tagger's clamp
+    ;; (reader.ingest.tag/clamp-label), so the dev UI shows a realistic vocabulary
+    ;; and filter bar without running the tag job over the network.
+    (let [baseline (fn [type-str id & labels]
+                     (tags/set-baseline! tx type-str id
+                                         (map (fn [l] {:tag-id     (:id (tags/find-or-create-label! tx l))
+                                                       :confidence 0.9})
+                                              labels)))]
+      (baseline "article" (:articles/id white)     "essay" "memoir" "california")
+      (baseline "article" (:articles/id slouching) "essay" "counterculture" "california")
+      (baseline "article" (:articles/id marvin)    "essay" "games")
+      (baseline "paper"   (:papers/id attention)   "deep learning" "nlp" "transformers")
+      (baseline "paper"   (:papers/id resnet)      "deep learning" "computer vision")
+      (baseline "newsletter_issue" (:newsletter-issues/id issue) "links" "commentary"))
+
     ;; Inboxes.
     (crud/create! tx :email-inboxes {:user-id (:users/id test-user) :alias test-inbox-alias})
     (crud/create! tx :email-inboxes {:user-id (:users/id marcus)    :alias "marcus+1@inbox.reader.test"})
@@ -292,15 +311,25 @@
     ;; Queues. Both users have several items, and they SHARE two readables — the
     ;; White Album and the Attention paper — held at different states by each.
     ;; That's the whole point of queue_items being per-user over shared readables.
-    (queue! tx test-user "article"          (:articles/id white)          "unread"  {:source "manual"})
-    (queue! tx test-user "article"          (:articles/id marvin)         "unread"  {:source "manual"})
-    (queue! tx test-user "paper"            (:papers/id attention)        "reading" {:source "import" :note "arXiv discovery"})
-    (queue! tx test-user "newsletter_issue" (:newsletter-issues/id issue) "read"    {:source "email"})
+    (let [tu-white (queue! tx test-user "article" (:articles/id white) "unread" {:source "manual"})]
+      (queue! tx test-user "article"          (:articles/id marvin)         "unread"  {:source "manual"})
+      (queue! tx test-user "paper"            (:papers/id attention)        "reading" {:source "import" :note "arXiv discovery"})
+      (queue! tx test-user "newsletter_issue" (:newsletter-issues/id issue) "read"    {:source "email"})
 
-    (queue! tx marcus "article"        (:articles/id white)     "reading" {:source "manual"})
-    (queue! tx marcus "article"        (:articles/id slouching) "unread"  {:source "manual"})
-    (queue! tx marcus "paper"          (:papers/id attention)   "unread"  {:source "import"})
-    (queue! tx marcus "paper"          (:papers/id resnet)      "read"    {:source "import"})
+      (queue! tx marcus "article"        (:articles/id white)     "reading" {:source "manual"})
+      (queue! tx marcus "article"        (:articles/id slouching) "unread"  {:source "manual"})
+      (queue! tx marcus "paper"          (:papers/id attention)   "unread"  {:source "import"})
+      (queue! tx marcus "paper"          (:papers/id resnet)      "read"    {:source "import"})
+
+      ;; Per-user override demo on test-user's White Album: suppress a baseline tag
+      ;; ("memoir") and pin one of their own ("favorites"), so the effective-tags
+      ;; delta (reader.domain.tags/resolve-effective) is exercised, not just the
+      ;; shared baseline. Uses the same verbs the override handlers do.
+      (let [qid (:queue-items/id tu-white)]
+        (tags/remove-tag! tx qid "article" (:articles/id white)
+                          (:id (tags/find-or-create-label! tx "memoir")))
+        (tags/add-tag! tx qid "article" (:articles/id white)
+                       (:id (tags/find-or-create-label! tx "favorites")))))
 
     ;; Durable jobs for the admin dashboard. The library papers above carry their
     ;; bodies already, so each one's :extract-paper job is recorded as `done` with

@@ -57,6 +57,7 @@
           (is (re-find #"Attention Is All You Need" body) "a paper title shows")
           (is (re-find #"Joan Didion" body) "an author byline shows")
           (is (re-find #"/authors/joan-didion" body) "author names link to their page")
+          (is (re-find #"/\?tag=essay" body) "a seeded baseline tag chip links into its filtered view")
           (is (re-find #"action=\"/queue/" body) "each item has an archive control")
           (is (re-find #"action=\"/logout\"" body) "a sign-out control is present")))
 

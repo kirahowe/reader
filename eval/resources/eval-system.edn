@@ -1,0 +1,86 @@
+;; The evals app's Integrant system (ADR 0006). A second app in this repo: it
+;; reuses the reader's infra + auth components (datasource/migrator, the
+;; middleware stack, the Hanko auth gate, login/logout, static, http-kit) and
+;; wires its own routes, handlers, operator gate, and port. The datasource spec
+;; is NOT here — dev/test layer embedded-db.edn, prod layers eval-prod.edn — so
+;; the same system runs locally or at the evals subdomain by profile alone.
+{:reader.log/publisher {:pretty? false}
+
+ ;; Same cross-cutting stack as the reader, outermost-first, with one addition:
+ ;; the operator gate sits just inside auth, so it sees the :user auth attached
+ ;; and admits only operators.
+ :reader.web.middleware/request-log {}
+ :reader.web.middleware/exception   {}
+ :reader.web.middleware/parameters  {}
+
+ :reader.concerns.reitit/router
+ {:middleware [#ig/ref :reader.web.middleware/request-log
+               #ig/ref :reader.web.middleware/exception
+               #ig/ref :reader.web.middleware/parameters
+               #ig/ref :reader.web/csrf
+               #ig/ref :reader.auth/middleware
+               #ig/ref :reader.eval.middleware/operator-gate]
+  :data
+  [["/"                {:get  {:handler #ig/ref :reader.eval.handlers/home}}]
+   ["/login"           {:public? true :get  {:handler #ig/ref :reader.handlers.auth/login}}]
+   ["/logout"          {:public? true :post {:handler #ig/ref :reader.handlers.auth/logout}}]
+   ["/overview"             {:get  {:handler #ig/ref :reader.eval.handlers/overview}}]
+   ["/workbench"            {:get  {:handler #ig/ref :reader.eval.handlers/workbench}}]
+   ["/workbench/tagging"    {:post {:handler #ig/ref :reader.eval.handlers/tagging-verdict}}]
+   ["/workbench/extraction" {:post {:handler #ig/ref :reader.eval.handlers/extraction-verdict}}]
+   ["/runs"            {:get  {:handler #ig/ref :reader.eval.handlers/runs}
+                        :post {:handler #ig/ref :reader.eval.handlers/run-benchmark}}]
+   ["/runs/case"       {:get  {:handler #ig/ref :reader.eval.handlers/run-case}}]
+   ["/tagging"         {:get  {:handler #ig/ref :reader.eval.handlers/tagging-index}}]
+   ["/tagging/case"    {:get  {:handler #ig/ref :reader.eval.handlers/tagging-case}}]
+   ["/extraction"      {:get  {:handler #ig/ref :reader.eval.handlers/extraction-index}}]
+   ["/extraction/case" {:get  {:handler #ig/ref :reader.eval.handlers/extraction-case}}]
+   ["/health"          {:public? true :get {:handler #ig/ref :reader.handlers/health}}]
+   ["/static/*"        {:public? true :handler #ig/ref :reader.handlers/static}]]}
+
+ :reader.concerns.reitit/default-handler {}
+ :reader.concerns.reitit/ring-handler
+ {:router          #ig/ref :reader.concerns.reitit/router
+  :default-handler #ig/ref :reader.concerns.reitit/default-handler}
+
+ ;; The eval app's own migrator: depends on the reader migrator (public schema
+ ;; first), then applies eval_* migrations on its own tracking table. Eval data
+ ;; components depend on this key to mean "both schemas are ready".
+ :reader.eval.db/migrator {:datasource           #ig/ref :reader.db/migrator
+                           :migrations-path      "eval-migrations"
+                           :migration-table-name "eval_schema_migrations"}
+
+ :reader.eval.handlers/home               {}
+ :reader.eval.handlers/overview           {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/workbench          {:datasource #ig/ref :reader.eval.db/migrator}
+ ;; Benchmark runs use the real inference path. `complete` is the pluggable
+ ;; reader.ai client — nil until a profile sets its api-key, so runs fall back to
+ ;; the deterministic stub offline (dev/test) and use the real model in prod.
+ :reader.ai/complete                      {}
+ :reader.eval.handlers/runs               {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/run-benchmark      {:datasource #ig/ref :reader.eval.db/migrator
+                                           :complete   #ig/ref :reader.ai/complete}
+ :reader.eval.handlers/run-case           {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/tagging-verdict    {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/extraction-verdict {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/tagging-index      {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/tagging-case       {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/extraction-index   {:datasource #ig/ref :reader.eval.db/migrator}
+ :reader.eval.handlers/extraction-case    {:datasource #ig/ref :reader.eval.db/migrator}
+
+ ;; The operator allowlist — empty by default (so the app 404s for everyone);
+ ;; the profiles grant access (the seeded user in dev, OPERATOR_EMAILS in prod).
+ :reader.eval.middleware/operator-gate {:operator-emails #{}}
+
+ ;; Reused reader infra/auth. jwks-url/issuer/api-url/allowed-emails + the CSRF
+ ;; site-origin are environment-specific and supplied by the profiles.
+ :reader.web/csrf {}
+ :reader.auth/middleware      {:datasource #ig/ref :reader.db/migrator}
+ :reader.handlers.auth/login  {}
+ :reader.handlers.auth/logout {}
+ :reader.handlers/health      {}
+ :reader.handlers/static      {:root "public"}
+
+ :reader.concerns/http-kit
+ {:handler #ig/ref :reader.concerns.reitit/ring-handler
+  :opts    {:port 8090 :ip "0.0.0.0"}}}

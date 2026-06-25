@@ -1,0 +1,342 @@
+/* eval.css — the evals app's diagnostic layer over the reader design system
+   (tokens.css), reusing main.css for shared chrome (.topbar, .brand, .btn).
+   Design thesis (ADR 0006): a case read like an editor's proof. The content
+   title keeps the book's serif voice; everything the pipeline reports — labels,
+   metrics, provenance — speaks in a quiet Inter "instrument" voice, so the two
+   never compete. The one signature device is .meter: confidence as a gauge.
+   Tints/tracks use color-mix over tokens, so dark mode follows for free. */
+
+.eval-main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-5) var(--s-7);
+}
+
+/* Section eyebrow — the instrument voice. Small, tracked Inter, never serif. */
+.eyebrow {
+  margin: 0 0 var(--s-3);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.block { margin-bottom: var(--s-6); }
+
+/* ── case header ─────────────────────────────────────────────────────────── */
+.case-head {
+  margin-bottom: var(--s-6);
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+.case-topline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+.case-title {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-prose);
+  font-size: 1.9rem;
+  line-height: 1.12;
+}
+.case-url {
+  display: inline-block;
+  margin-top: var(--s-3);
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+}
+.case-url a { color: var(--muted); }
+
+/* status: a dot + word. Green = clean, gold = needs a look (failed/skipped). */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.status::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.status.is-failed::before,
+.status.is-skipped::before { background: var(--gold); }
+
+/* ── scorecard — one bordered instrument panel, hairline-divided tiles ─────── */
+/* Dividers are per-tile borders (not a gap-background), pulled onto the
+   container edge with -1px margins, so a ragged last row leaves invisible paper
+   instead of a stray filled band. minmax(7.5rem) fits the 6-tile card in one row. */
+.scorecard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  margin-bottom: var(--s-6);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  margin: -1px 0 0 -1px;
+  background: var(--paper);
+  border-left: 1px solid var(--rule);
+  border-top: 1px solid var(--rule);
+}
+.tile .label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tile .value {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.375rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+/* ── confidence meter (signature) ──────────────────────────────────────────
+   A thin gauge: filled in accent, gold when low. Fill width is the one inline
+   style we allow — it's a per-case value, not a rule. */
+.meter {
+  height: 5px;
+  margin-top: var(--s-1);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  overflow: hidden;
+}
+.meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.meter.is-low > i { background: var(--gold); }
+
+/* ── evidence: two coherent columns ────────────────────────────────────────
+   left = what the pipeline produced, right = where it came from. */
+.evidence {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-6);
+  margin-bottom: var(--s-6);
+}
+@media (max-width: 38rem) { .evidence { grid-template-columns: 1fr; } }
+
+/* key/value provenance rows */
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--s-2) var(--s-4);
+  align-items: baseline;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+}
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; color: var(--ink-soft); }
+.kv .missed { color: var(--gold); font-weight: 600; }
+
+/* resolved byline — order is real, so it's a numbered list */
+.byline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: b;
+}
+.byline li {
+  display: flex;
+  gap: var(--s-3);
+  align-items: baseline;
+  font-family: var(--font-prose);
+  font-size: 1.0625rem;
+}
+.byline li::before {
+  counter-increment: b;
+  content: counter(b);
+  min-width: 1ch;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.source-name { font-family: var(--font-prose); font-size: 1.0625rem; }
+.source-kind {
+  margin-top: var(--s-1);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* assigned tags with inline confidence meters; proposed as quiet chips */
+.tags { display: flex; flex-direction: column; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+.tag-row { display: grid; grid-template-columns: 1fr 2.5rem; gap: var(--s-2) var(--s-3); align-items: center; }
+.tag-row .name { font-family: var(--font-ui); font-size: 0.9375rem; color: var(--ink); }
+.tag-row .score { font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 0.8125rem; color: var(--muted); text-align: right; }
+.tag-row .meter { grid-column: 1 / -1; }
+
+.proposed { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.proposed .tag {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  color: var(--ink-soft);
+}
+.proposed .tag.dropped { color: var(--muted); border-style: dashed; }
+
+.subblock + .subblock { margin-top: var(--s-5); }
+.caption { margin-top: var(--s-3); font-family: var(--font-ui); font-size: 0.75rem; color: var(--muted); }
+
+.content-excerpt { font-family: var(--font-prose); color: var(--ink-soft); line-height: 1.55; }
+
+/* ── list (ledger) tables ──────────────────────────────────────────────────── */
+table.ledger { width: 100%; margin-top: var(--s-5); border-collapse: collapse; font-family: var(--font-ui); font-size: 0.875rem; }
+table.ledger thead th {
+  padding: 0 var(--s-3) var(--s-2);
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule-2);
+}
+table.ledger td { padding: var(--s-3); border-bottom: 1px solid var(--rule); vertical-align: middle; }
+table.ledger tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+table.ledger a.title { font-family: var(--font-prose); font-size: 1.0625rem; }
+table.ledger .num { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.cell-meter { display: flex; align-items: center; gap: var(--s-2); }
+.cell-meter .meter { width: 3rem; margin: 0; }
+.cell-meter .num { min-width: 2.25rem; }
+
+/* ── landing ───────────────────────────────────────────────────────────────── */
+.eval-cards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-5); }
+@media (max-width: 38rem) { .eval-cards { grid-template-columns: 1fr; } }
+.eval-cards .card h2 { font-family: var(--font-prose); font-size: 1.4rem; margin: 0 0 var(--s-2); }
+.eval-cards .card a { text-decoration: none; }
+
+/* raw provenance, de-emphasized */
+details.raw { margin-top: var(--s-5); border-top: 1px solid var(--rule); padding-top: var(--s-4); }
+details.raw summary { font-family: var(--font-ui); font-size: 0.8125rem; color: var(--muted); cursor: pointer; }
+details.raw pre {
+  margin-top: var(--s-3);
+  padding: var(--s-3);
+  overflow: auto;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border-radius: var(--r-sm);
+}
+
+.empty { font-family: var(--font-ui); color: var(--muted); }
+
+/* ── page header with a pipeline toggle ───────────────────────────────────── */
+.page-top { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-5); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--rule-2); border-radius: 999px; }
+.seg a { padding: 0.2rem 0.8rem; border-radius: 999px; font-family: var(--font-ui); font-size: 0.8125rem; color: var(--muted); }
+.seg a.is-on { background: var(--accent-tint); color: var(--accent); }
+
+/* benchmark variant picker — model override + response-format, beside the button */
+.run-config { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.run-config input[type="text"], .run-config select {
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-ui); font-size: 0.875rem; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--rule-2); border-radius: var(--r-sm);
+}
+.run-config input[type="text"] { min-width: 18rem; }
+
+/* ── workbench: a focused review station, narrower than the dashboard ──────── */
+.wb-top { display: flex; align-items: center; gap: var(--s-5); margin-bottom: var(--s-6); }
+.progress { flex: 1; }
+.progress .track { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.progress .track > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.progress .count { margin: var(--s-2) 0 0; font-family: var(--font-ui); font-size: 0.75rem; color: var(--muted); }
+.wb-queue-meta { font-family: var(--font-ui); font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+.wb-case-title { margin: var(--s-2) 0 0; font-family: var(--font-prose); font-size: 1.6rem; line-height: 1.15; }
+.wb-case-url { display: inline-block; margin-top: var(--s-2); font-family: var(--font-ui); font-size: 0.8125rem; }
+.wb-case-url a { color: var(--muted); }
+.wb-excerpt {
+  margin: var(--s-4) 0 0;
+  font-family: var(--font-prose); color: var(--ink-soft); line-height: 1.55;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* the ask — the one clear question per case */
+.ask { margin: var(--s-6) 0 var(--s-4); font-family: var(--font-ui); font-size: 1.0625rem; font-weight: 600; color: var(--ink); }
+
+/* taggable chips: default = correct, click/number = flag wrong */
+.review-chips { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+/* A flaggable item: a <label> wrapping a hidden checkbox, so clicking (or the
+   keyboard layer) toggles "this is wrong" with no JS needed for the styling —
+   CSS :has reflects the checked state. */
+.rchip {
+  position: relative;
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  padding: 0.3rem 0.6rem 0.3rem 0.45rem;
+  font-family: var(--font-ui); font-size: 0.9375rem; color: var(--ink);
+  border: 1px solid var(--rule-2); border-radius: 999px;
+  cursor: pointer; user-select: none;
+}
+.rchip input { position: absolute; opacity: 0; pointer-events: none; margin: 0; }
+.rchip .k { font-size: 0.6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rchip:has(input:checked) { color: var(--gold); border-color: var(--gold); text-decoration: line-through; }
+.rchip:has(input:checked) .k { color: var(--gold); }
+.rchip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.add-tag { margin-top: var(--s-4); }
+.add-tag input {
+  width: 100%; padding: var(--s-2) var(--s-3);
+  font-family: var(--font-ui); font-size: 0.9375rem; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--rule-2); border-radius: var(--r-sm);
+}
+.hint { margin-top: var(--s-3); font-family: var(--font-ui); font-size: 0.75rem; color: var(--muted); }
+
+/* footer actions + keycaps */
+.wb-actions { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-6); padding-top: var(--s-4); border-top: 1px solid var(--rule); }
+.wb-actions .keys { display: flex; gap: var(--s-4); margin-left: auto; font-family: var(--font-ui); font-size: 0.75rem; color: var(--muted); }
+.kbd {
+  display: inline-block; min-width: 1.1em; padding: 0.05rem 0.35rem;
+  font-family: var(--font-ui); font-size: 0.75rem; text-align: center;
+  color: var(--ink-soft); background: var(--paper-2);
+  border: 1px solid var(--rule-2); border-radius: var(--r-sm); box-shadow: 0 1px 0 var(--rule-2);
+}
+
+/* ── overview ──────────────────────────────────────────────────────────────── */
+.score-row { display: flex; gap: var(--s-6); flex-wrap: wrap; }
+.score .label { font-family: var(--font-ui); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.score .value { margin: var(--s-1) 0; font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 1.6rem; color: var(--ink); }
+.score .meter { width: 4.5rem; }
+
+.bars { display: flex; flex-direction: column; gap: var(--s-3); }
+.bar-row { display: grid; grid-template-columns: 9rem 1fr 2.25rem; gap: var(--s-3); align-items: center; font-family: var(--font-ui); font-size: 0.875rem; }
+.bar-row .bl { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-row .track { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden; }
+.bar-row .track > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.bar-row .bv { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.fail-list { display: flex; flex-direction: column; gap: var(--s-2); margin: 0; padding: 0; list-style: none; font-family: var(--font-ui); font-size: 0.8125rem; }
+.fail-list .err { color: var(--gold); }
+.fail-list .url { margin-left: var(--s-3); color: var(--muted); }

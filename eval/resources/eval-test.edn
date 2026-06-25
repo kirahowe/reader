@@ -1,0 +1,14 @@
+;; Test profile for the evals app: layered as [eval-system.edn embedded-db.edn
+;; eval-test.edn]. Verifies against the committed test JWKS (tests mint matching
+;; tokens via reader.test-support.auth). allowed-emails is a superset of the
+;; operators on purpose, so a provisioned-but-non-operator user (a plain reader
+;; user) exercises the operator gate's 404.
+{:reader.concerns/http-kit {:opts {:port 0}}
+
+ :reader.auth/middleware
+ {:jwks-url       #resource "test-jwks.json"
+  :allowed-emails #{"op@x.test" "reader@x.test"}}
+
+ :reader.handlers.auth/login {:api-url "https://test.invalid"}
+
+ :reader.eval.middleware/operator-gate {:operator-emails #{"op@x.test"}}}

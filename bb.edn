@@ -32,8 +32,11 @@
             :override-builtin true
             :task             (dep/sh! "clojure" "-M:dev:test")}
 
-  dev      {:doc  "Run the dev system; reuses a running REPL if one is up"
+  dev      {:doc  "Run the dev (reader) system; reuses a running REPL if one is up"
             :task (dev-task/dev!)}
+
+  dev:eval {:doc  "Run the evals app locally (embedded DB on :3001)"
+            :task (dep/sh! "clojure" "-M:dev:eval" "embedded-db.edn" "eval-dev.edn")}
 
   lint     {:doc  "Lint with clj-kondo"
             :task (dep/sh! "clojure" "-M:lint")}

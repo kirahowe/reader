@@ -1,0 +1,21 @@
+;; Local dev profile for the evals app: layered as
+;; [eval-system.edn embedded-db.edn eval-dev.edn] (run via -M:dev:eval).
+;;
+;; Uses its own embedded-postgres data dir, separate from the reader's
+;; (/tmp/reader-dev-db) — two embedded clusters can't share one dir. So this is
+;; for developing the dashboards against eval-seeded data; to inspect the
+;; reader's real corpus locally, point at the shared DB instead by layering a
+;; profile that supplies a :reader.db/datasource :spec :jdbc-url (e.g. a Neon
+;; branch) in place of embedded-db.edn.
+{:reader.log/publisher {:pretty? true}
+
+ :reader.concerns/http-kit {:opts {:port 3001}}
+ :reader.web/csrf          {:site-origin "http://localhost:3001"}
+
+ ;; Same dev Hanko project as the reader; the seeded user is the lone operator.
+ :reader.auth/middleware {:api-url        "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"
+                          :allowed-emails #{"test@example.com"}}
+ :reader.handlers.auth/login {:api-url "https://61ea63c0-a1ce-428e-8f22-30fa5c5cb455.hanko.io"}
+ :reader.eval.middleware/operator-gate {:operator-emails #{"test@example.com"}}
+
+ :reader.dev.infra/postgres {:data-dir "/tmp/reader-eval-db"}}

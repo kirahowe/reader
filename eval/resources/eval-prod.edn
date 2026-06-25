@@ -1,0 +1,40 @@
+;; Prod profile for the evals app at evals.themiscellany.app (ADR 0006). A second
+;; Fly app pointed at the same Neon DB as the reader. It only reads the reader's
+;; tables, so migrate-on-init? is false (the reader's release_command owns the
+;; public schema); the eval app's own migrations (eval_* tables, Phase 2) run on
+;; a separate tracking table. Access is operator-only: OPERATOR_EMAILS gates both
+;; provisioning (auth allowed-emails) and the operator gate.
+{:reader.concerns/http-kit {:opts {:port #env/long ["PORT" 8080]}}
+
+ :reader.db/datasource
+ {:spec {:jdbc-url                    #env "DATABASE_URL"
+         :pool-name                   "reader-eval-pool"
+         :maximum-pool-size           4
+         :minimum-idle                0
+         :connection-timeout          30000
+         :idle-timeout                30000
+         :max-lifetime                300000
+         :initialization-fail-timeout -1}}
+
+ :reader.db/migrator
+ {:datasource       #ig/ref :reader.db/datasource
+  :migrations-path  "migrations"
+  :migrate-on-init? false}
+
+ :reader.web/csrf {:site-origin #env "SITE_ORIGIN"}
+
+ :reader.auth/middleware
+ {:api-url        #env "HANKO_API_URL"
+  :allowed-emails #env/set "OPERATOR_EMAILS"}
+
+ :reader.handlers.auth/login {:api-url #env "HANKO_API_URL"}
+
+ :reader.eval.middleware/operator-gate {:operator-emails #env/set "OPERATOR_EMAILS"}
+
+ ;; Benchmark runs call the real inference path in prod (dev/test fall back to the
+ ;; deterministic stub, since no key is set there). Same OpenRouter defaults as
+ ;; the reader; LLM_API_KEY flips it live, and a run can override the model from
+ ;; the Runs UI per variant.
+ :reader.ai/complete {:api-url #env/opt ["LLM_API_URL" "https://openrouter.ai/api/v1"]
+                      :api-key #env/opt "LLM_API_KEY"
+                      :model   #env/opt ["LLM_MODEL" "openai/gpt-4o-mini"]}}

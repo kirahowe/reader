@@ -1,0 +1,32 @@
+FROM eclipse-temurin:25-jdk AS build
+WORKDIR /app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates rlwrap \
+ && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/install.sh https://github.com/clojure/brew-install/releases/latest/download/posix-install.sh \
+ && chmod +x /tmp/install.sh \
+ && /tmp/install.sh
+COPY deps.edn build.clj ./
+# Prefetch the build tool + the :eval app deps (incl. Datastar) into a cached
+# layer keyed on deps.edn, so a code change doesn't re-download them.
+RUN clojure -P -T:build && clojure -P -A:eval
+COPY src ./src
+COPY resources ./resources
+COPY eval ./eval
+RUN clojure -T:build eval-uberjar
+
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+COPY --from=build /app/target/reader-eval.jar /app/reader-eval.jar
+EXPOSE 8080
+# The evals app (ADR 0006) is a second Fly app built from a superset image
+# (reader domain + eval). eval-system.edn + eval-prod.edn ship inside the jar as
+# classpath resources, so there is no /app/conf to mount (unlike the reader). The
+# eval migrator applies eval_* migrations on boot (it owns its own tracking
+# table), so this app needs no release_command.
+#
+# Same cold-start JVM flags as the reader image: SerialGC + TieredStopAtLevel=1
+# trade peak throughput for a faster boot-to-listen on a scale-to-zero, single
+# shared vCPU. They stay before -cp so the JVM prefix is stable.
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-cp", "/app/reader-eval.jar"]
+CMD ["reader.eval.main", "eval-prod.edn"]

@@ -76,12 +76,13 @@
    :exit  0})
 
 (defn init!
-  "Create the Fly app for this project (one-time setup). The name
-   comes from fly.toml's `app = ...`; change it there if the default
-   is taken on Fly's global namespace."
-  ([] (init! default-app-name
-             #(silent "flyctl" "status" "-a" %)
-             dep/say! dep/sh! "personal"))
+  "Create the Fly app for this project (one-time setup). The name comes from the
+   given toml's `app = ...` (default `fly.toml`, or `fly.eval.toml` for the evals
+   app); change it there if the default is taken on Fly's global namespace."
+  ([] (init! "fly.toml"))
+  ([toml] (init! #(default-app-name toml)
+                 #(silent "flyctl" "status" "-a" %)
+                 dep/say! dep/sh! "personal"))
   ([app-name-fn status-fn say-fn sh-fn org]
    (let [app     (app-name-fn)
          exists? (zero? (:exit (status-fn app)))]

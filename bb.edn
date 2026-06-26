@@ -22,6 +22,11 @@
    :depends [flyctl:authed]
    :task    (fly/require-app! (fly/default-app-name) "Run `bb fly:init` to create it")}
 
+  fly:eval:app-exists
+  {:private true
+   :depends [flyctl:authed]
+   :task    (fly/require-app! (fly/default-app-name "fly.eval.toml") "Run `bb fly:init:eval` to create it")}
+
   docker:installed
   {:private true
    :task    (dep/require-cli! "docker" "https://docs.docker.com/get-docker/")}
@@ -70,6 +75,14 @@
             :depends [fly:app-exists]
             :task    (dep/sh! "flyctl" "deploy" "--remote-only")}
 
+  deploy:eval {:doc     "Deploy the evals app to fly.io (fly.eval.toml)"
+               :depends [fly:eval:app-exists]
+               :task    (dep/sh! "flyctl" "deploy" "--remote-only" "-c" "fly.eval.toml")}
+
   fly:init {:doc     "Create the Fly.io app for this project (one-time setup)"
             :depends [flyctl:authed]
-            :task    (fly/init!)}}}
+            :task    (fly/init!)}
+
+  fly:init:eval {:doc     "Create the evals Fly.io app (one-time setup)"
+                 :depends [flyctl:authed]
+                 :task    (fly/init! "fly.eval.toml")}}}

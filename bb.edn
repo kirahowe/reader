@@ -28,9 +28,9 @@
 
   ;; --- user-facing tasks ---
 
-  repl     {:doc              "Start a Clojure REPL with dev + test on the classpath"
+  repl     {:doc              "Start an interactive nREPL (dev + test on the classpath); advertises .nrepl-port"
             :override-builtin true
-            :task             (dep/sh! "clojure" "-M:dev:test")}
+            :task             (dep/sh! "clojure" "-M:dev:test:nrepl")}
 
   dev      {:doc  "Run the dev (reader) system; reuses a running REPL if one is up"
             :task (dev-task/dev!)}

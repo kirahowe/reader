@@ -47,6 +47,15 @@
                          io.zonky.test.postgres/embedded-postgres-binaries-linux-amd64    {:mvn/version "17.5.0"}}
            :main-opts   ["-m" "kaocha.runner"]}
 
+  ;; Main-opts-only overlay: combined LAST (after :dev:test) so its REPL
+  ;; main-opts win over :test's kaocha runner — otherwise `bb repl` runs the
+  ;; suite and exits. Starts an interactive cider nREPL that advertises
+  ;; .nrepl-port, so `bb repl` composes with `bb dev`'s reuse path. nrepl/cider
+  ;; deps come from :dev, which it's always combined with.
+  :nrepl  {:main-opts ["-m" "nrepl.cmdline"
+                       "--middleware" "[cider.nrepl/cider-middleware]"
+                       "--interactive"]}
+
   :prod   {:extra-paths ["env/prod/resources"]
            :main-opts   ["-m" "reader.main" "prod.edn"]}
 

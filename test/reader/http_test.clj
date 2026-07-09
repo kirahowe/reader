@@ -51,7 +51,7 @@
         (let [{:keys [status headers body]} (-> (mock/request :get "/") test-auth/authed handler)]
           (is (= 200 status))
           (is (re-find #"(?i)text/html" (get headers "content-type")))
-          (is (re-find #"Your reading list" body))
+          (is (re-find #"<h1>Queue</h1>" body))
           (is (re-find #"The White Album" body) "an article title shows")
           (is (re-find #"href=\"/queue/[^\"]+\">The White Album" body) "titles link to the reader view")
           (is (re-find #"Attention Is All You Need" body) "a paper title shows")

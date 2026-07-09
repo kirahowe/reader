@@ -25,7 +25,7 @@
      [:a.brand.brand-lg {:href "/"}
       [:span.brand-mark c/icon-book]
       [:span.brand-word "Reader"]]
-     [:h1 "Welcome back"]
-     [:p.muted.login-tag "Your calm queue for articles, papers, and newsletters."]
+     [:h1 "Sign in"]
+     [:p.muted.login-tag "Articles, papers, and newsletters, in one queue."]
      [:hanko-auth]
      [:script {:type "module"} (hanko-island api-url)]]]))

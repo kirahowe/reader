@@ -26,7 +26,10 @@
         com.cognitect.aws/api             {:mvn/version "0.8.741"}
         com.cognitect.aws/endpoints       {:mvn/version "871.2.30.22"}
         com.cognitect.aws/s3              {:mvn/version "871.2.30.22"}
-        haikunator/haikunator             {:mvn/version "0.1.0"}}
+        haikunator/haikunator             {:mvn/version "0.1.0"}
+        ;; Datastar SDK (server-driven SSE reactivity) — the reader UI and the
+        ;; evals app both patch the DOM from the server through it.
+        dev.data-star.clojure/http-kit    {:mvn/version "1.0.0-RC11"}}
 
  :aliases
  {:dev    {:extra-paths ["env/dev/src" "env/dev/resources" "infra/src" "infra/resources"]
@@ -39,8 +42,7 @@
            :main-opts   ["-m" "reader.dev.main"]}
 
   :test   {:extra-paths ["test" "eval/src" "eval/resources" "env/test/resources" "infra/src" "infra/resources"]
-           :extra-deps  {dev.data-star.clojure/http-kit                                   {:mvn/version "1.0.0-RC11"}
-                         lambdaisland/kaocha                                              {:mvn/version "1.91.1392"}
+           :extra-deps  {lambdaisland/kaocha                                              {:mvn/version "1.91.1392"}
                          ring/ring-mock                                                   {:mvn/version "0.6.2"}
                          io.zonky.test/embedded-postgres                                  {:mvn/version "2.1.0"}
                          io.zonky.test.postgres/embedded-postgres-binaries-darwin-arm64v8 {:mvn/version "17.5.0"}
@@ -66,9 +68,6 @@
   ;; port and operator allowlist. Compose with :dev for a local embedded DB
   ;; (clojure -M:dev:eval) or :prod for the deployed subdomain.
   :eval   {:extra-paths ["eval/src" "eval/resources"]
-           ;; Datastar SDK (server-driven SSE) — eval-only for now; pulls the core
-           ;; sdk transitively. The reader migrates onto it separately.
-           :extra-deps  {dev.data-star.clojure/http-kit {:mvn/version "1.0.0-RC11"}}
            :main-opts   ["-m" "reader.eval.main"]}
 
   :lint   {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2026.04.15"}}

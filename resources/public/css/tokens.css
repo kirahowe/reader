@@ -2,23 +2,23 @@
   /* Reading Room — warm paper, ink, and a deep reading-room green.
      The palette is deliberately calm: a single green accent does the
      work, with a warm gold reserved for transient/attention states. */
-  --paper:    #faf7f0;  /* page background */
-  --paper-2:  #f3eee2;  /* raised surfaces: search bar, cards */
-  --ink:      #20201c;  /* primary text */
-  --ink-soft: #44423b;  /* body prose, secondary text */
-  --muted:    #837c6e;  /* meta, captions */
-  --rule:     #e7e0d0;  /* hairline dividers */
-  --rule-2:   #d8cfba;  /* stronger borders: inputs, buttons */
-  --accent:   #2f6354;  /* deep green — links, primary actions */
-  --accent-2: #6f9d8f;  /* lighter green — blockquote rule, dots */
-  --accent-tint: #e7efe9; /* green wash for chips/focus rings */
-  --gold:     #9a6a2f;  /* warm secondary: in-progress, failures */
+  --paper:    #f7f4ec;  /* page background */
+  --paper-2:  #efeadd;  /* raised surfaces: search bar, cards */
+  --ink:      #1d1c18;  /* primary text */
+  --ink-soft: #48463f;  /* body prose, secondary text */
+  --muted:    #7d776a;  /* meta, captions */
+  --rule:     #e5ddcc;  /* hairline dividers */
+  --rule-2:   #d3c9b2;  /* stronger borders: inputs, buttons */
+  --accent:   #31604f;  /* deep green — links, primary actions */
+  --accent-2: #6e9c8c;  /* lighter green — blockquote rule, dots */
+  --accent-tint: #e4ede7; /* green wash for chips/focus rings */
+  --gold:     #96682e;  /* warm secondary: in-progress, failures */
 
   --shadow-sm: 0 1px 2px rgba(38, 33, 22, 0.05);
   --shadow-md: 0 8px 30px -12px rgba(38, 33, 22, 0.18);
 
-  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-prose: "Iowan Old Style", "Source Serif Pro", Charter, Georgia, serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-prose: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
 
   --measure: 40rem;  /* reading column */
   --feed: 46rem;     /* list/page column */
@@ -35,21 +35,24 @@
   --s-5: 1.5rem;
   --s-6: 2.5rem;
   --s-7: 4rem;
+
+  /* Comfortable touch target (Apple HIG floor). */
+  --tap: 44px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper:    #16161a;
-    --paper-2:  #1f1f24;
-    --ink:      #ece9e1;
-    --ink-soft: #cbc7bc;
-    --muted:    #908b80;
-    --rule:     #2a2a31;
-    --rule-2:   #383841;
-    --accent:   #7fc3b0;
-    --accent-2: #4f8475;
-    --accent-tint: #1c2a26;
-    --gold:     #d3a567;
+    --paper:    #161613;
+    --paper-2:  #201f1b;
+    --ink:      #e9e6dc;
+    --ink-soft: #c6c2b6;
+    --muted:    #8d887b;
+    --rule:     #2b2a25;
+    --rule-2:   #3a3830;
+    --accent:   #83c3ae;
+    --accent-2: #4e8272;
+    --accent-tint: #20302a;
+    --gold:     #d0a465;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
   }

@@ -1,7 +1,13 @@
 (ns reader.ui.pages.home
-  "The home page: the reading list — every readable, with its source and
+  "The home page: the reading queue — every readable, with its source and
    byline. The author's own affiliation is deliberately not shown here; it
-   lives on the author page."
+   lives on the author page.
+
+   Reactivity is Datastar, server-authoritative: the add form @posts and the
+   server prepends an importing row over SSE; that row polls its own /row
+   endpoint until the import settles; archiving a row removes it in place.
+   Every form keeps a plain method/action, so the page still works without
+   JavaScript."
   (:require [reader.ui.components :as c]
             [reader.ui.layout :as layout]))
 
@@ -30,6 +36,15 @@
            (and nav? current?) (assoc :aria-current "true"))
       label])))
 
+(defn- archive-form
+  "The row's archive control: a real form (works without JS), intercepted by
+   Datastar so the row disappears in place."
+  [queue-item-id]
+  (let [action (str "/queue/" queue-item-id "/archive")]
+    [:form.readable-actions {:method "post" :action action
+                             :data-on-submit__prevent (str "@post('" action "')")}
+     (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-archive)]))
+
 (defn item [{:keys [queue-item-id title tags active-tag] :as readable}]
   [:li.readable {:id (str "q-" queue-item-id)}
    [:div.readable-text
@@ -37,19 +52,16 @@
     (meta-line readable)
     (when (seq tags)
       (into [:div.readable-tags] (map #(tag-chip active-tag %) tags)))]
-   [:form.readable-actions {:method "post"
-                            :action (str "/queue/" queue-item-id "/archive")}
-    (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-trash)]])
+   (archive-form queue-item-id)])
 
 (defn importing-row
   "A placeholder queue row for an article still being fetched/extracted. It
-   polls its own /queue/:id/row endpoint and replaces itself (outerHTML) once
-   the status changes to done or failed."
+   polls its own /queue/:id/row endpoint; the server patches the settled row in
+   (which carries no interval, so the poll stops on its own)."
   [queue-item-id url]
-  [:li.readable.importing {:id         (str "q-" queue-item-id)
-                           :hx-get     (str "/queue/" queue-item-id "/row")
-                           :hx-trigger "load delay:1.5s, every 2s"
-                           :hx-swap    "outerHTML"}
+  [:li.readable.importing {:id (str "q-" queue-item-id)
+                           :data-on-interval__duration.2s
+                           (str "@get('/queue/" queue-item-id "/row')")}
    [:div.readable-text
     [:h2.readable-title [:span.spinner {:aria-hidden "true"}] " Importing…"]
     [:div.readable-meta [:span.meta-item [:span.import-url url]]]]])
@@ -62,8 +74,7 @@
    [:div.readable-text
     [:h2.readable-title "Couldn’t import"]
     [:div.readable-meta [:span.meta-item [:span.import-url label]]]]
-   [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
-    (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-trash)]])
+   (archive-form queue-item-id)])
 
 (defn unavailable-row
   "A terminal row for a paper whose source metadata isn't available yet — a brand
@@ -76,12 +87,28 @@
     [:div.readable-meta
      [:span.meta-item
       "Not indexed yet — new papers can take a few days to appear. Check back later."]]]
-   [:form.readable-actions {:method "post" :action (str "/queue/" queue-item-id "/archive")}
-    (c/button {:type "submit" :variant :icon :aria-label "Archive"} c/icon-trash)]])
+   (archive-form queue-item-id)])
 
 (defn- subtitle [readables]
   (let [n (count readables)]
-    (str n (if (= 1 n) " item" " items") " to work through")))
+    (str n (if (= 1 n) " item" " items"))))
+
+(defn- add-form
+  "The add-by-URL bar. The input is bound to the $url signal so the server can
+   clear it after a successful add; $adding (set by Datastar for the duration of
+   the request) drives the pending state."
+  []
+  [:form.add-url {:method "post" :action "/readables"
+                  :data-indicator "adding"
+                  :data-class "{'is-adding': $adding}"
+                  :data-on-submit__prevent "@post('/readables', {contentType: 'form'})"}
+   [:input {:type "url" :name "url" :data-bind "url"
+            :placeholder "Paste a URL to save it"
+            :aria-label "URL of an article, paper, or newsletter to add"
+            :required true :autocomplete "off"}]
+   (c/button {:type "submit" :variant :primary :data-attr-disabled "$adding"}
+             [:span.add-label "Add"]
+             [:span.add-busy {:aria-hidden "true"} [:span.spinner] "Adding"])])
 
 (defn- filter-bar
   "The tag filter row above the list: an \"All\" affordance plus a chip per tag in
@@ -95,26 +122,20 @@
           (map #(tag-chip active % :nav) all-tags))))
 
 (defn render
-  "The reading list. `readables` are the (already tag-filtered) queue items,
+  "The reading queue. `readables` are the (already tag-filtered) queue items,
    `active` the slug currently filtering (or nil), `all-tags` the full vocabulary
    for the filter bar."
   [readables active all-tags]
   (layout/app-page
    "Reader" :queue
    (list
-    (c/page-head "Your reading list"
+    (c/page-head "Queue"
                  (when (seq readables) (subtitle readables)))
-    [:form.add-url {:method  "post" :action "/readables"
-                    :hx-post "/readables" :hx-target "#readables-list" :hx-swap "afterbegin"}
-     [:span.add-url-icon {:aria-hidden "true"} "+"]
-     [:input {:type "url" :name "url" :placeholder "Paste an article, paper, or newsletter URL…"
-              :required true :autocomplete "off"}]
-     (c/button {:type "submit" :variant :primary} "Add to queue")]
+    (add-form)
     (filter-bar all-tags active)
-    ;; Always render the list (even empty) so the HTMX afterbegin target exists.
-    [:ul.readables {:id "readables-list"}
-     (map #(item (assoc % :active-tag active)) readables)]
-    (when-not (seq readables)
-      [:p.muted (if active
-                  "No items with this tag yet."
-                  "Nothing here yet — paste a URL above to add your first article.")]))))
+    ;; The list always renders (even empty) so SSE prepends have a target; the
+    ;; empty-state message is CSS on the empty <ul>, so it appears and
+    ;; disappears with the rows without any bookkeeping.
+    (into [:ul.readables {:id "readables-list"
+                          :class (when active "is-filtered")}]
+          (map #(item (assoc % :active-tag active)) readables)))))

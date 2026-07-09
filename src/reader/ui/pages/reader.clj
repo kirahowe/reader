@@ -57,40 +57,56 @@
       (re-find #"(?i)^mailto:" unsubscribe-url)
       [:a {:href unsubscribe-url} "Unsubscribe"])))
 
-(defn- action-form [id verb label & [variant]]
-  [:form {:method "post" :action (str "/queue/" id "/" verb)}
-   (components/button (cond-> {:type "submit"} variant (assoc :variant variant)) label)])
+(defn- toggle-form
+  "The read/unread toggle as a form. The Datastar intercept lets the server
+   patch #reader-controls in place over SSE (no reload); the plain
+   method/action keeps it working without JavaScript."
+  [id verb label]
+  (let [action (str "/queue/" id "/" verb)]
+    [:form {:method "post" :action action
+            :data-on-submit__prevent (str "@post('" action "')")}
+     (components/button {:type "submit" :variant :primary} label)]))
 
-(defn- controls
-  "Read/unread toggle (by state) plus archive. The toggle is the primary action;
-   archive stays a quiet secondary. Hidden for an archived item, which is only
-   reachable by a stale or hand-typed URL."
+(defn controls
+  "Read/unread toggle (by state) plus archive, as the patchable #reader-controls
+   fragment. The toggle is the primary action; archive stays a quiet secondary —
+   and a plain form, since archiving leaves this page for the queue anyway.
+   Hidden for an archived item, which is only reachable by a stale or hand-typed
+   URL — the wrapper div still renders so an SSE patch always has its target."
   [{:queue-items/keys [id state]}]
-  (when (not= "archived" state)
-    [:div.reader-actions
-     (if (= "read" state)
-       (action-form id "unread" "Mark as unread" :primary)
-       (action-form id "read"   "Mark as read"   :primary))
-     (action-form id "archive" "Archive")]))
+  [:div#reader-controls.reader-actions
+   (when (not= "archived" state)
+     (list
+      (if (= "read" state)
+        (toggle-form id "unread" "Mark unread")
+        (toggle-form id "read"   "Mark read"))
+      [:form {:method "post" :action (str "/queue/" id "/archive")}
+       (components/button {:type "submit"} "Archive")]))])
 
-(defn- tags-editor
+(defn tags-editor
   "This item's effective tags — each a chip with a remove control — plus an
-   add-tag field. Owner-scoped writes post to /queue/:id/tags(/...)."
+   add-tag field, as the patchable #reader-tags fragment. Owner-scoped writes
+   post to /queue/:id/tags(/...); with Datastar the server patches this section
+   back over SSE and clears the $tag signal the input is bound to."
   [queue-item-id tags]
-  [:section.reader-tags {:aria-label "Tags"}
+  [:section#reader-tags.reader-tags {:aria-label "Tags"}
    (into [:ul.reader-tag-list]
          (concat
           (map (fn [{:keys [id label]}]
-                 [:li.reader-tag
-                  [:span.chip.chip--tag label]
-                  [:form {:method "post" :action (str "/queue/" queue-item-id "/tags/" id "/remove")}
-                   [:button.tag-remove {:type "submit" :aria-label (str "Remove tag: " label)} "×"]]])
+                 (let [action (str "/queue/" queue-item-id "/tags/" id "/remove")]
+                   [:li.reader-tag
+                    [:span.chip.chip--tag label]
+                    [:form {:method "post" :action action
+                            :data-on-submit__prevent (str "@post('" action "')")}
+                     [:button.tag-remove {:type "submit" :aria-label (str "Remove tag: " label)} "×"]]]))
                tags)
           [[:li.reader-tag-add
-            [:form {:method "post" :action (str "/queue/" queue-item-id "/tags")}
-             [:input {:type "text" :name "label" :placeholder "Add a tag…"
-                      :required true :autocomplete "off" :maxlength "60"}]
-             (components/button {:type "submit"} "Add")]]]))])
+            (let [action (str "/queue/" queue-item-id "/tags")]
+              [:form {:method "post" :action action
+                      :data-on-submit__prevent (str "@post('" action "', {contentType: 'form'})")}
+               [:input {:type "text" :name "label" :data-bind "tag" :placeholder "Add a tag…"
+                        :required true :autocomplete "off" :maxlength "60"}]
+               (components/button {:type "submit"} "Add")])]]))])
 
 (defn show
   "`queue-item` is the raw queue_items row (for state/controls); `content` is the

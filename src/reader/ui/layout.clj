@@ -13,11 +13,19 @@
         [:html {:lang "en"}
          [:head
           [:meta {:charset "utf-8"}]
-          [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+          ;; viewport-fit=cover lets the shell paint into the notch/home-bar
+          ;; areas on phones; safe-area insets in main.css keep content clear.
+          [:meta {:name "viewport"
+                  :content "width=device-width, initial-scale=1, viewport-fit=cover"}]
+          [:meta {:name "theme-color" :media "(prefers-color-scheme: light)" :content "#f7f4ec"}]
+          [:meta {:name "theme-color" :media "(prefers-color-scheme: dark)" :content "#161613"}]
           [:title title]
           [:link {:rel "stylesheet" :href "/static/css/tokens.css"}]
           [:link {:rel "stylesheet" :href "/static/css/main.css"}]
-          [:script {:src "/static/js/htmx.min.js" :defer true}]]
+          ;; Datastar: server-authoritative reactivity over SSE. Forms are
+          ;; intercepted per-element (data-on-submit) and the server patches
+          ;; the DOM; without JS every form still posts and redirects.
+          [:script {:type "module" :src "/static/js/datastar.js"}]]
          [:body body]])))
 
 (defn- nav-link [href label active? key]
@@ -59,7 +67,7 @@
         [:main
          [:h1 "Not found"]
          [:p.muted message]
-         [:p [:a {:href "/"} "Back to your reading list"]]]))
+         [:p [:a {:href "/"} "Back to your queue"]]]))
 
 (defn forbidden
   "The body for a 403. Offers a sign-out so a signed-in but un-invited visitor
@@ -80,4 +88,4 @@
         [:main
          [:h1 "Something went wrong"]
          [:p.muted "An unexpected error occurred. The problem has been logged."]
-         [:p [:a {:href "/"} "Back to your reading list"]]]))
+         [:p [:a {:href "/"} "Back to your queue"]]]))

@@ -1,0 +1,36 @@
+tasks:
+  install:
+    name: Install dependencies
+    triggeredBy:
+      - manual
+      - postDevcontainerStart
+      - prebuild
+    command: clojure -P -M:dev:test:eval && clojure -P -T:build
+
+  build:
+    name: Build
+    triggeredBy:
+      - manual
+    dependsOn:
+      - install
+    command: bb build
+
+  ci:
+    name: CI
+    triggeredBy:
+      - manual
+    dependsOn:
+      - install
+    command: bb ci
+
+services:
+  reader:
+    name: Reader
+    triggeredBy:
+      - manual
+      - postEnvironmentStart
+    commands:
+      start: |
+        ona environment port open 3000 --dont-wait --admission creator_only --name Reader
+        exec bb dev
+      ready: curl -sf http://localhost:3000/health

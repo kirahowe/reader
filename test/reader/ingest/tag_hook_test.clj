@@ -23,7 +23,8 @@
               pay   (:jobs/payload (first jobs))]
           (is (= 1 (count jobs)))
           (is (= "newsletter_issue" (:readable-type pay)))
-          (is (= (str (:newsletter-issues/id issue)) (:readable-id pay)))))
+          (is (= (str (:newsletter-issues/id issue)) (:readable-id pay)))
+          (is (= 1 (:content-version pay)))))
       (testing "a redelivery of the same issue does not enqueue a second job"
         (jdbc/with-transaction [tx ds]
           (newsletters/record-issue! tx (:users/id user)

@@ -13,6 +13,6 @@
     ;; parses to nil) all answer 404 — never another user's content.
     (let [id (request/path-uuid req)]
       (if-let [{:keys [queue-item readable]} (and id (reading/open datasource (:user-id req) id))]
-        (response/html (pages/show queue-item (extract/extract readable)
-                                   (tags/effective-for-queue-item datasource queue-item)))
+        (response/reader-html (pages/show queue-item (extract/extract readable)
+                                          (tags/effective-for-queue-item datasource queue-item)))
         (response/not-found "No such item in your reading list.")))))

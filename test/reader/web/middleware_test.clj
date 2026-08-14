@@ -23,4 +23,6 @@
           {:keys [status headers body]} (handler (mock/request :get "/"))]
       (is (= 500 status))
       (is (= "text/html; charset=utf-8" (get headers "content-type")))
+      (is (= "no-referrer" (get headers "referrer-policy")))
+      (is (= "nosniff" (get headers "x-content-type-options")))
       (is (string? body)))))

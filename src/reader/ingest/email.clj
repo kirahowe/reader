@@ -267,14 +267,34 @@
     (.addProtocols "a" "href" (into-array String ["http" "https" "mailto"]))
     (.addProtocols "img" "src" (into-array String ["http" "https"]))))
 
-(defn- normalize-body [html]
+(defn- normalized-heading [s]
+  (some-> s str/lower-case (str/replace #"\s+" " ") str/trim not-empty))
+
+(defn- duplicate-byline? [^Element el authors]
+  (let [text  (normalized-heading (.text el))
+        names (keep #(normalized-heading (:name %)) authors)]
+    (and text (seq names) (str/starts-with? text "by ")
+         (every? #(str/includes? text %) names))))
+
+(defn- normalize-body [html subject authors]
   (when-let [html (blank->nil html)]
     (let [raw (Jsoup/parseBodyFragment html)]
+      ;; A promoted byline belongs in the reader's metadata row, not repeated at
+      ;; the top of the body. Only remove a declared byline that contains every
+      ;; extracted author name; unrelated author mentions remain untouched.
+      (when-let [^Element byline (.selectFirst raw "body > .byline, body > [rel=author], body > [itemprop=author]")]
+        (when (duplicate-byline? byline authors) (.remove byline)))
       (doseq [^Element img (.select raw "img")]
         (when (tracker? img) (.remove img)))
       (let [clean (Jsoup/clean (.html (.body raw)) "" newsletter-safelist)
             doc   (Jsoup/parseBodyFragment clean)]
         (doseq [^Element h1 (.select doc "h1")] (.tagName h1 "h2"))
+        ;; The reader already renders the canonical subject as its h1. Many
+        ;; newsletters repeat that exact title at the top of their HTML; remove
+        ;; only an exact, direct-child duplicate so section headings survive.
+        (when-let [^Element heading (.selectFirst doc "body > h2, body > h3")]
+          (when (= (normalized-heading subject) (normalized-heading (.text heading)))
+            (.remove heading)))
         (doseq [^Element el (.select doc "table, th, td, img")]
           (.removeAttr el "width")
           (.removeAttr el "height"))
@@ -423,12 +443,13 @@
         raw-html   (:raw-html extracted)
         body-meta  (body-metadata raw-html {:name (:from-name original)
                                             :email (:from-email original)})
-        body-html  (normalize-body raw-html)
         hops       (vec (:hops extracted))
         forwarded? (boolean (seq hops))
-        newsletter {:subject           (or (:subject original)
-                                           (when forwarded? (strip-forward-prefixes (:subject delivery)))
-                                           (:subject delivery))
+        subject    (or (:subject original)
+                       (when forwarded? (strip-forward-prefixes (:subject delivery)))
+                       (:subject delivery))
+        body-html  (normalize-body raw-html subject (:authors body-meta))
+        newsletter {:subject           subject
                     :from-name         (:from-name original)
                     :from-email        (:from-email original)
                     :sent-at           (:sent-at original)

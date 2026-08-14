@@ -346,6 +346,37 @@ Dev stores the `.eml` on local disk (the `:file` backend under the configurable
 `:direct` endpoint is open on localhost; set its `:token` for a reachable PR
 tenant. The rest of this section is the **production** wiring:
 
+#### Reprocessing stored newsletters
+
+Raw `.eml` objects are retained, so parser improvements can repair existing
+issues in place. Extraction is versioned: a deploy never starts a bulk rewrite,
+and normal retries cannot overwrite a newer result. Reprocessing preserves the
+issue/queue identity and read/archive state while atomically replacing normalized
+metadata, body HTML, source, and authorships. It then queues version-gated
+retagging so an older tag job cannot overwrite the new extraction.
+
+After deploying a parser-version change, queue one bounded production batch:
+
+```sh
+fly ssh console -C \
+  'java -cp /app/conf:/app/reader.jar reader.reprocess_newsletters prod.edn 100'
+```
+
+Repeat until it reports `Queued 0 stale newsletter(s)`. The regular
+`reprocess-newsletter` worker consumes those jobs from R2; missing raw objects
+fail explicitly without deleting or partially updating an issue. Pending and
+in-progress jobs are excluded when another batch is scheduled, and stale tagging
+jobs cannot write over newer newsletter content.
+
+In a running dev REPL, the equivalent is:
+
+```clojure
+(require '[integrant.repl.state :as state]
+         '[reader.ingest :as ingest])
+(ingest/enqueue-newsletter-reprocessing!
+ (:reader.db/datasource state/system) {:limit 100})
+```
+
 **1. A domain on Cloudflare.** Register (or transfer) a domain so its DNS is on
 Cloudflare — this is the host part of every alias. The app is also served from
 it, so add the custom domain to Fly and point Hanko at it:

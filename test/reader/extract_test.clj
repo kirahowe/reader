@@ -91,7 +91,10 @@
       (is (= [] (:links out)))
       (is (= "https://act.test/unsub" (:unsubscribe-url out))))
     (testing "its stored (ingest-sanitized) body is rendered raw, not a placeholder"
+      (is (= :newsletter-issue (:kind out)))
       (is (re-find #"This week's links" rendered))
+      (is (re-find #"class=\"prose newsletter-body\"" rendered))
+      (is (re-find #"data-content-kind=\"newsletter\"" rendered))
       (is (re-find #"<h1>" rendered) "stored markup is rendered, not escaped")
       (is (not (re-find #"(?i)not available in the reader" rendered))))))
 

@@ -14,6 +14,15 @@
                                 :canonical-url "https://example.test/b-trees"
                                 :body-html "<p>Indexes and storage.</p>"})))
 
+(defn- seed-newsletter [ds version]
+  (let [aff (crud/create! ds :affiliations
+                          {:name "Letters" :slug (str "letters-" version) :type "newsletter"})]
+    (crud/create! ds :newsletter-issues
+                  {:affiliation-id (:affiliations/id aff)
+                   :subject "Versioned issue" :body-html "<p>Current content.</p>"
+                   :raw-email-object-key (str "inbox/version-" version ".eml")
+                   :extraction-version version})))
+
 (defn- fixed-tagger [proposals]
   (fn [_content _existing] {:tags proposals :model "stub-model"}))
 
@@ -125,3 +134,29 @@
           (is (true? (:fatal? (ex-data ex)))))
         (is (= "failed" (:tagging-events/outcome
                          (first (crud/find-many ds :tagging-events)))))))))
+
+(deftest stale-newsletter-tag-jobs-never-overwrite-current-tags
+  (with-system [system]
+    (let [ds     (:reader.db/datasource system)
+          issue  (seed-newsletter ds 2)
+          id     (:newsletter-issues/id issue)
+          called (atom 0)
+          d      (assoc deps :infer-tags (fn [& _] (swap! called inc)
+                                           {:tags [{:label "Old" :confidence 1.0}]
+                                            :model "stale"}))]
+      (testing "an already-stale payload is discarded before model work"
+        (is (= {:stale? true}
+               (job/tag-readable! ds {:readable-type "newsletter_issue"
+                                      :readable-id (str id) :content-version 1} d)))
+        (is (zero? @called))
+        (is (empty? (crud/find-many ds :readable-tags {:readable-id id}))))
+      (testing "a version change during model work is caught before database writes"
+        (let [racing (assoc deps :infer-tags
+                            (fn [& _]
+                              (crud/update! ds :newsletter-issues id {:extraction-version 3})
+                              {:tags [{:label "Raced" :confidence 1.0}] :model "raced"}))]
+          (is (= {:stale? true}
+                 (job/tag-readable! ds {:readable-type "newsletter_issue"
+                                        :readable-id (str id) :content-version 2} racing)))
+          (is (empty? (crud/find-many ds :readable-tags {:readable-id id})))
+          (is (empty? (crud/find-many ds :readable-embeddings {:readable-id id}))))))))

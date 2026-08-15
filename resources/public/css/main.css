@@ -368,7 +368,7 @@ main {
 .form .btn--primary { padding-inline: var(--s-5); }
 
 /* ---- Reader view -------------------------------------------- */
-.reader { max-width: var(--measure); margin-inline: auto; }
+.reader { max-width: var(--measure); min-width: 0; margin-inline: auto; }
 .reader-head { margin-bottom: var(--s-6); padding-bottom: var(--s-5); border-bottom: 1px solid var(--rule); }
 .kicker {
   display: inline-block;
@@ -391,7 +391,15 @@ main {
 .reader-meta a { color: var(--ink-soft); }
 .reader-meta a:hover { color: var(--accent); }
 
-.reader .prose { font-family: var(--font-prose); font-size: 1.2rem; line-height: 1.75; color: var(--ink-soft); }
+.reader .prose {
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--font-prose);
+  font-size: 1.2rem;
+  line-height: 1.75;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
 .reader .prose > * + * { margin-top: var(--s-5); }
 .reader .prose h2, .reader .prose h3 { color: var(--ink); margin-top: var(--s-6); margin-bottom: var(--s-3); }
 .reader .prose blockquote {
@@ -412,6 +420,30 @@ main {
   color: var(--accent);
 }
 .reader .prose .placeholder { font-style: italic; }
+
+/* Newsletter HTML starts life as fixed-width email layout. The ingest boundary
+   removes width attributes and inline styles; these last-mile rules contain
+   intrinsically wide media/tables and keep long tracking URLs from widening the
+   phone viewport. Tables scroll locally when their content truly cannot reflow. */
+.reader .newsletter-body { width: 100%; overflow-x: hidden; overflow-x: clip; }
+.reader .newsletter-body :where(img, video, svg, canvas) {
+  display: block;
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+.reader .newsletter-body :where(table) {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.reader .newsletter-body :where(tbody, thead, tfoot, tr, td, th) { max-width: 100%; }
+.reader .newsletter-body :where(td, th, a) { overflow-wrap: anywhere; word-break: break-word; }
+.reader .newsletter-body :where(pre, code) { max-width: 100%; overflow-x: auto; white-space: pre-wrap; }
+.reader .newsletter-body > :first-child { margin-top: 0; }
 
 /* External links (DOI, arXiv, the original) get a trailing ↗. */
 .reader-links { display: flex; flex-wrap: wrap; gap: var(--s-4); font-size: 0.9375rem; margin-top: var(--s-6); }
@@ -528,4 +560,15 @@ table.eval thead th { color: var(--muted); }
   main { padding: var(--s-5) var(--s-4); }
   .page-head { flex-direction: column; align-items: flex-start; gap: var(--s-3); }
   .readable-actions button { opacity: 1; }
+  .reader-head { margin-bottom: var(--s-5); padding-bottom: var(--s-4); }
+  .reader-head h1 { font-size: clamp(1.8rem, 1.45rem + 4vw, 2.35rem); }
+  .reader .prose { font-size: 1.0625rem; line-height: 1.7; }
+  .reader .prose blockquote { margin-inline: 0; padding-left: var(--s-4); font-size: 1.1rem; }
+  .reader-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 360px) {
+  .topbar-inner { justify-content: center; padding-inline: var(--s-3); }
+  .brand { display: none; }
+  .topnav { width: 100%; justify-content: space-between; gap: var(--s-1); font-size: 0.75rem; }
 }

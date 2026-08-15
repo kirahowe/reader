@@ -1,7 +1,7 @@
 (ns reader.extract
   "The extraction abstraction. Turns a stored readable (`reader.domain.readables/find-one`
    payload) into a uniform content map the reader view renders blind to type:
-   {:title :authors :source :date :body :links}. Polymorphic on the readable's
+   {:kind :title :authors :source :date :body :links}. Polymorphic on the readable's
    :type.
 
    Article, paper, and newsletter-issue bodies render the stored HTML produced by
@@ -38,7 +38,7 @@
    placeholder (an issue with an empty body is unusual but renders cleanly)."
   [row]
   (if-let [html (not-empty (:newsletter-issues/body-html row))]
-    [:div.prose (hu/raw-string html)]
+    [:div.prose.newsletter-body {:data-content-kind "newsletter"} (hu/raw-string html)]
     (placeholder-body nil)))
 
 (defn- paper-body
@@ -54,13 +54,14 @@
 (defn- common
   "The type-independent fields, taken straight from the normalized item."
   [{:keys [item]}]
-  {:title   (:title item)
+  {:kind    (:type item)
+   :title   (:title item)
    :authors (:authors item)
    :source  (:source item)})
 
 (defmulti extract
   "A `reader.domain.readables/find-one` payload ({:item :row}) -> the uniform content
-   map {:title :authors :source :date :body :links}. Dispatches on readable :type."
+   map {:kind :title :authors :source :date :body :links}. Dispatches on readable :type."
   (fn [{:keys [item]}] (:type item)))
 
 (defmethod extract :article [{:keys [row] :as readable}]

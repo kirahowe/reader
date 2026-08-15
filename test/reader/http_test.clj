@@ -244,11 +244,14 @@
             (is (re-find #"arxiv\.org/abs/1706\.03762" body) "an arXiv link")))
 
         (testing "GET /queue/:id renders a newsletter reader view with its stored body"
-          (let [{:keys [status body]} (GET (str "/queue/" qn))]
+          (let [{:keys [status headers body]} (GET (str "/queue/" qn))]
             (is (= 200 status))
             (is (re-find #"ACT links for the week" body) "the subject shows")
             (is (re-find #"grab bag of links" body) "the sanitized newsletter body renders")
-            (is (not (re-find #"(?i)not available in the reader" body)) "not the placeholder")))
+            (is (not (re-find #"(?i)not available in the reader" body)) "not the placeholder")
+            (is (= "no-referrer" (get headers "referrer-policy")))
+            (is (re-find #"script-src 'self'" (get headers "content-security-policy")))
+            (is (re-find #"img-src 'self' https:" (get headers "content-security-policy")))))
 
         (testing "POST /queue/:id/read marks it read and stays on the reader view"
           (let [{:keys [status headers]} (POST (str "/queue/" qa "/read"))]

@@ -132,8 +132,68 @@
         (newsletters/record-issue! tx (parse-uuid (str user-id))
                                    (assoc parsed :message-id mid :raw-key r2-key))))))
 
+(defn reprocess-newsletter!
+  "Re-extract one stored newsletter from its immutable raw email. Version-gated
+   and idempotent unless payload `:force?` is true. The persisted delivery
+   Message-ID/object key remain authoritative even if the raw headers differ."
+  [ds store {:keys [newsletter-issue-id force?]}]
+  (let [issue-id (parse-uuid (str newsletter-issue-id))
+        issue    (or (crud/by-id ds :newsletter-issues issue-id)
+                     (throw (ex-info "newsletter issue not found"
+                                     {:newsletter-issue-id issue-id
+                                      :error-class :missing-readable :fatal? true})))
+        current  (or (:newsletter-issues/extraction-version issue) 1)]
+    (if (and (not force?) (>= current email/extraction-version))
+      {:issue issue :applied? false}
+      (let [r2-key (:newsletter-issues/raw-email-object-key issue)
+            raw    (storage/get-object store r2-key)]
+        (when-not raw
+          (throw (ex-info "no stored object for newsletter reprocessing"
+                          {:r2-key r2-key :newsletter-issue-id issue-id
+                           :error-class :missing-object :fatal? true})))
+        (let [parsed (assoc (email/parse raw)
+                            :message-id (:newsletter-issues/message-id issue)
+                            :raw-key r2-key)]
+          (jdbc/with-transaction [tx ds]
+            (newsletters/apply-extraction! tx issue-id parsed {:force? force?})))))))
+
+(defn enqueue-newsletter-reprocessing!
+  "Queue stale newsletter issues for versioned re-extraction. Existing pending
+   or in-progress jobs are excluded, and row locks make concurrent schedulers
+   converge. Returns the queued issue ids. Nothing runs automatically on deploy."
+  ([ds] (enqueue-newsletter-reprocessing! ds {}))
+  ([ds {:keys [limit] :or {limit 100}}]
+   (jdbc/with-transaction [tx ds]
+     (let [rows (jdbc/execute!
+                 tx
+                 (sql/format
+                  {:select   [[[:raw "ni.id"] :id]]
+                   :from     [[:newsletter-issues :ni]]
+                   :where    [:and
+                              [:< :ni.extraction-version email/extraction-version]
+                              [:not
+                               [:exists
+                                {:select [[1]]
+                                 :from   [[:jobs :j]]
+                                 :where  [:and
+                                          [:= :j.queue-name "reprocess-newsletter"]
+                                          [:in :j.state ["pending" "in_progress"]]
+                                          [:= [:raw "j.payload ->> 'newsletter-issue-id'"]
+                                           [:raw "ni.id::text"]]]}]]]
+                   :order-by [[:ni.created-at :asc] [:ni.id :asc]]
+                   :limit    (max 1 (min 1000 limit))
+                   :for      [:update :skip-locked]})
+                 crud/opts)
+           ids  (mapv #(or (:newsletter-issues/id %) (:id %)) rows)]
+       (doseq [issue-id ids]
+         (jobs/enqueue! tx "reprocess-newsletter" {:newsletter-issue-id issue-id}))
+       ids))))
+
 (defmethod ig/init-key :reader.ingest/ingest-email-handler [_ {store :storage}]
   (fn [ds payload] (ingest-email! ds store payload)))
+
+(defmethod ig/init-key :reader.ingest/reprocess-newsletter-handler [_ {store :storage}]
+  (fn [ds payload] (reprocess-newsletter! ds store payload)))
 
 (defmethod ig/init-key :reader.ingest/entity-extractor [_ _]
   ;; The default entity-extraction abstraction. Swap this key's value for an

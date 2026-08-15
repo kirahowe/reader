@@ -1,8 +1,9 @@
 (ns reader.ui.pages.reader
   "The reader view: one queued readable. Renders the uniform content map from
-   `reader.extract` (so it's blind to readable type) plus the read controls,
-   which are driven by the queue item's state."
-  (:require [reader.ui.components :as components]
+   `reader.extract`; its kind is exposed only as semantic markup so newsletter
+   layout can be contained without changing article/paper typography."
+  (:require [clojure.string :as str]
+            [reader.ui.components :as components]
             [reader.ui.layout :as layout]))
 
 (defn- format-date
@@ -28,6 +29,13 @@
         parts       (remove nil? [byline-frag date-frag])]
     (when (seq parts)
       (into [:div.reader-meta] parts))))
+
+(defn- normalized-label [s]
+  (some-> s str str/lower-case (str/replace #"\s+" " ") str/trim
+          (str/replace-first #"^the\s+" "")))
+
+(defn- same-label? [a b]
+  (= (normalized-label a) (normalized-label b)))
 
 (defn- http-url?
   "True only for http(s) URLs. This is the render boundary where a DB-sourced href
@@ -100,10 +108,11 @@
    (:title content) nil
    (list
     (components/back-link "/")
-    [:article.reader
+    [:article.reader {:data-readable-type (some-> (:kind content) name)}
      [:div.reader-head
       (when-let [source (:source content)]
-        (components/kicker (:name source)))
+        (when-not (same-label? (:name source) (:title content))
+          (components/kicker (:name source))))
       [:h1 (:title content)]
       (meta-line content)]
      (:body content)

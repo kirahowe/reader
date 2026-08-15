@@ -53,3 +53,15 @@
           html       (reader/show queue-item content [])]
       (is (re-find #"2024-01-15" html) "the date renders as yyyy-MM-dd")
       (is (not (re-find #"10:30" html)) "the time portion is dropped"))))
+
+(deftest readable-type-is-exposed-semantically
+  (let [queue-item {:queue-items/id (random-uuid) :queue-items/state "reading"}
+        html       (reader/show queue-item {:kind :newsletter-issue :title "Issue"} [])]
+    (is (re-find #"data-readable-type=\"newsletter-issue\"" html))))
+
+(deftest source-kicker-does-not-repeat-the-title
+  (let [queue-item {:queue-items/id (random-uuid) :queue-items/state "reading"}
+        html       (reader/show queue-item {:kind :newsletter-issue
+                                            :title "The Systems Dispatch"
+                                            :source {:name "Systems Dispatch"}} [])]
+    (is (not (re-find #"class=\"kicker\"" html)))))

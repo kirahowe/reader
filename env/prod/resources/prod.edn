@@ -55,6 +55,7 @@
   :secret     #env/opt "R2_SECRET_ACCESS_KEY"}
 
  :reader.ingest/ingest-email-handler {:storage #ig/ref :reader.storage/store}
+ :reader.ingest/reprocess-newsletter-handler {:storage #ig/ref :reader.storage/store}
 
  ;; The webhook's shared HMAC secret (same value as the Worker's Wrangler
  ;; secret); the handler fails closed when it's unset. Alias domain defaults to
@@ -91,6 +92,7 @@
  :reader.jobs/worker {:datasource        #ig/ref :reader.db/migrator
                       :handlers          {"extract-article" #ig/ref :reader.ingest/extract-article-handler
                                           "ingest-email"    #ig/ref :reader.ingest/ingest-email-handler
+                                          "reprocess-newsletter" #ig/ref :reader.ingest/reprocess-newsletter-handler
                                           "extract-paper"   #ig/ref :reader.papers/extract-paper-handler
                                           "tag-readable"    #ig/ref :reader.ingest.tag-job/handler}
                       :poll-ms           1000

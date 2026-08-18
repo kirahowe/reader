@@ -253,6 +253,58 @@
           (is (str/includes? body-html needle))
           (is (not (str/includes? body-html "Outer note"))))))))
 
+(deftest recognizes-realistic-apple-mail-split-header-rows
+  ;; Redacted structural regression derived from a real Apple Mail .eml. Apple
+  ;; emits the marker and every original header as separate blockquote children;
+  ;; the earlier synthetic fixture put all headers in one div and missed this.
+  (let [html (str "<div id=\"lineBreakAtBeginningOfMessage\"><br></div>"
+                  "<p>Outer note.</p><blockquote type=\"cite\">"
+                  "<div>Begin forwarded message:</div><br class=\"Apple-interchange-newline\">"
+                  "<div><span><b>From:</b></span> <span>Real Author &lt;author@real.example&gt;<br></span></div>"
+                  "<div><span><b>Subject:</b></span> <span><b>Real Issue</b><br></span></div>"
+                  "<div><span><b>Date:</b></span> <span>Mon, 8 Jun 2026 12:00:00 +0000<br></span></div>"
+                  "<div><span><b>To:</b></span> <span>Alice &lt;alice@personal.test&gt;<br></span></div>"
+                  "<div><span><b>Reply-To:</b></span> <span>Replies &lt;reply@real.example&gt;<br></span></div>"
+                  "<br><div><table><tbody><tr><td><p>The real newsletter body.</p></td></tr></tbody></table></div>"
+                  "</blockquote>")
+        {:keys [forwarded? subject from-name body-html forward]}
+        (email/parse (.getBytes (client-forward-eml "Fwd: Real Issue" html) "UTF-8"))]
+    (is (true? forwarded?))
+    (is (= :apple-mail (-> forward :hops first :client)))
+    (is (= "Real Issue" subject))
+    (is (= "Real Author" from-name))
+    (is (str/includes? body-html "real newsletter body"))
+    (is (not (str/includes? body-html "Begin forwarded message")))
+    (is (not (str/includes? body-html "Reply-To:")))
+    (is (not (str/includes? body-html "Outer note")))))
+
+(deftest recognizes-undashed-apple-plain-forward-marker
+  (let [raw (str/join "\r\n"
+                      ["From: Alice <alice@personal.test>"
+                       "Subject: Fwd: Plain Apple Issue"
+                       "Message-ID: <plain-apple@personal.test>"
+                       "Content-Type: text/plain; charset=UTF-8"
+                       ""
+                       "Outer note."
+                       ""
+                       "Begin forwarded message:"
+                       ""
+                       "From: Plain Author <author@plain.example>"
+                       "Subject: Plain Apple Issue"
+                       "Date: Mon, 8 Jun 2026 12:00:00 +0000"
+                       "To: Alice <alice@personal.test>"
+                       ""
+                       "The plain Apple newsletter body."
+                       ""])
+        {:keys [forwarded? subject from-name body-html forward]}
+        (email/parse (.getBytes raw "UTF-8"))]
+    (is (true? forwarded?))
+    (is (= :plain (-> forward :hops first :client)))
+    (is (= "Plain Apple Issue" subject))
+    (is (= "Plain Author" from-name))
+    (is (str/includes? body-html "plain Apple newsletter body"))
+    (is (not (str/includes? body-html "Outer note")))))
+
 (deftest extracts-a-forwarded-rfc822-attachment
   (let [raw (str/join "\r\n"
                       ["From: Alice Forwarder <alice@personal.test>"

@@ -14,7 +14,7 @@
            (org.jsoup.nodes Document Element)
            (org.jsoup.safety Safelist)))
 
-(def extraction-version 2)
+(def extraction-version 3)
 
 (def ^:private max-forward-depth 5)
 (def ^:private max-mime-parts 100)
@@ -172,11 +172,6 @@
 (def ^:private inline-forward-specs
   [{:client :gmail :header-selector ".gmail_quote .gmail_attr"
     :signals [:gmail-quote :gmail-forward-header]}
-   ;; Apple Mail puts the original in a cite blockquote whose first compact div
-   ;; is the forwarded header. The preceding marker is the corroborating signal.
-   {:client :apple-mail :header-selector "blockquote[type=cite] > div"
-    :marker #"(?i)begin forwarded message"
-    :signals [:apple-forward-marker :cited-body]}
    ;; Outlook's reply and forward wrapper is shared, so the outer Fwd/Fw subject
    ;; is required to distinguish this from an ordinary reply.
    {:client :outlook :header-selector "#divRplyFwdMsg, .OutlookMessageHeader"
@@ -190,25 +185,71 @@
    {:client :thunderbird :header-selector ".moz-forward-container .moz-email-headers-table"
     :signals [:mozilla-forward-container :mozilla-header-table]}])
 
+(defn- header-row?
+  "Apple Mail renders each embedded header as its own direct-child div, including
+   fields we do not promote (such as Reply-To). Recognize the shape without
+   depending on a fixed list or leaking an unknown header into the body."
+  [^Element el]
+  (boolean (re-find #"(?i)^\s*[^:\n]{1,32}:\s*\S" (.wholeText el))))
+
+(defn- body-after-apple-headers [children start]
+  (loop [i start headers {}]
+    (if-let [^Element el (get children i)]
+      (cond
+        (header-row? el)
+        (recur (inc i) (merge headers (embedded-headers (embedded-header-text el))))
+
+        ;; A compact break separates Apple Mail's sibling header rows from the
+        ;; cited message. Skip all such separators before retaining the body.
+        (and (= "br" (.tagName el)) (:from headers) (:subject headers))
+        {:headers headers
+         :body    (elements-html (drop-while #(= "br" (.tagName ^Element %))
+                                             (subvec children i)))}
+
+        ;; Older Apple markup may put the body directly after one combined
+        ;; header div, without a separating br.
+        (and (:from headers) (:subject headers))
+        {:headers headers :body (elements-html (subvec children i))}
+
+        :else nil)
+      nil)))
+
+(defn- apple-inline-forward [^Document doc]
+  (when (re-find #"(?i)begin forwarded message" (.wholeText doc))
+    (some (fn [^Element quote]
+            (let [children (vec (.children quote))]
+              (some (fn [i]
+                      (when (:from (embedded-headers
+                                    (embedded-header-text (get children i))))
+                        (when-let [{:keys [headers body]}
+                                   (body-after-apple-headers children i)]
+                          (when body
+                            {:detected? true :client :apple-mail :confidence 0.95
+                             :signals [:apple-forward-marker :split-header-rows :cited-body]
+                             :headers headers :body-html body}))))
+                    (range (count children)))))
+          (.select doc "blockquote[type=cite]"))))
+
 (defn- inline-forward [env html]
   (when-let [html (blank->nil html)]
     (let [doc (Jsoup/parse html)]
-      (some (fn [{:keys [client header-selector marker require-forward-subject? signals]}]
-              (some (fn [^Element h]
-                      (let [headers (embedded-headers (embedded-header-text h))
-                            body    (elements-html (elements-after h))]
-                        (when (and (:from headers)
-                                   (:subject headers)
-                                   body
-                                   (or (nil? marker) (re-find marker (.wholeText doc)))
-                                   (or (not require-forward-subject?) (forward-subject? (:subject env))))
-                          {:detected? true :client client :confidence 0.95 :signals signals
-                           :headers headers :body-html body})))
-                    (.select doc header-selector)))
-            inline-forward-specs))))
+      (or (apple-inline-forward doc)
+          (some (fn [{:keys [client header-selector marker require-forward-subject? signals]}]
+                  (some (fn [^Element h]
+                          (let [headers (embedded-headers (embedded-header-text h))
+                                body    (elements-html (elements-after h))]
+                            (when (and (:from headers)
+                                       (:subject headers)
+                                       body
+                                       (or (nil? marker) (re-find marker (.wholeText doc)))
+                                       (or (not require-forward-subject?) (forward-subject? (:subject env))))
+                              {:detected? true :client client :confidence 0.95 :signals signals
+                               :headers headers :body-html body})))
+                        (.select doc header-selector)))
+                inline-forward-specs)))))
 
 (def ^:private plain-forward-marker
-  #"(?i)^\s*-{2,}\s*(?:begin\s+)?forwarded\s+(?:message|email)\s*-{2,}\s*$")
+  #"(?i)^\s*(?:-{2,}\s*)?(?:begin\s+)?forwarded\s+(?:message|email)\s*:?\s*(?:-{2,})?\s*$")
 
 (defn- plain-forward [plain]
   (when-let [plain (blank->nil plain)]
@@ -217,7 +258,9 @@
                                                       (re-matches plain-forward-marker %2)) %1)
                                           lines))]
       (when marker-idx
-        (let [after  (subvec lines (inc marker-idx))
+        (let [after  (->> (subvec lines (inc marker-idx))
+                          (drop-while str/blank?)
+                          vec)
               blank  (first (keep-indexed #(when (str/blank? %2) %1) after))
               hlines (if blank (subvec after 0 blank) [])
               headers (embedded-headers (str/join "\n" hlines))
